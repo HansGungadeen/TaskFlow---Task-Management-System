@@ -60,6 +60,7 @@ type Task = {
   reminder_sent: boolean | null;
   has_dependencies?: boolean;
   dependencies_completed?: boolean;
+  user_id?: string;
 };
 
 type TaskDashboardProps = {
@@ -91,11 +92,19 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
   const { theme } = useTheme();
 
   const supabase = createClient();
+  const [userData, setUserData] = useState<any>(null);
 
-  // Set isClient to true once component mounts
+  // Set isClient to true once component mounts and fetch user data
   useEffect(() => {
     setIsClient(true);
-  }, []);
+
+    const fetchUserData = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUserData(data);
+    };
+
+    fetchUserData();
+  }, [supabase.auth]);
 
   // Fetch task dependencies
   useEffect(() => {
@@ -141,20 +150,25 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
         setDependencyStatus(status);
 
         // Update tasks with dependency information
-        setTasks(
-          tasks.map((task) => ({
-            ...task,
-            has_dependencies: dependencies[task.id]?.length > 0,
-            dependencies_completed: status[task.id] || false,
-          })),
-        );
+        const updatedTasks = tasks.map((task) => ({
+          ...task,
+          has_dependencies: dependencies[task.id]?.length > 0,
+          dependencies_completed: status[task.id] || false,
+        }));
+
+        // Only update if there are actual changes to prevent infinite loops
+        const hasChanges =
+          JSON.stringify(updatedTasks) !== JSON.stringify(tasks);
+        if (hasChanges) {
+          setTasks(updatedTasks);
+        }
       } catch (error) {
         console.error("Error fetching task dependencies:", error);
       }
     };
 
     fetchTaskDependencies();
-  }, [tasks, supabase]);
+  }, [tasks.length]);
 
   // Apply filters when tasks or dueDateFilter changes
   useEffect(() => {
@@ -651,11 +665,31 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
                     {currentTask && (
                       <TaskDependencySelector
                         taskId={currentTask.id}
-                        userId={currentTask.user_id}
+                        userId={userData?.user?.id || ""}
                         onDependenciesChange={() => {
-                          // Refresh dependencies after changes
-                          const updatedTasks = [...tasks];
-                          setTasks(updatedTasks);
+                          // Fetch updated task dependencies without causing a re-render loop
+                          const fetchUpdatedDependencies = async () => {
+                            try {
+                              const { data: updatedTasksData } = await supabase
+                                .from("tasks")
+                                .select("*")
+                                .eq("user_id", userData?.user?.id || "");
+
+                              if (updatedTasksData) {
+                                // Only update if there are actual changes
+                                const hasChanges =
+                                  JSON.stringify(updatedTasksData) !==
+                                  JSON.stringify(tasks);
+                                if (hasChanges) {
+                                  setTasks(updatedTasksData);
+                                }
+                              }
+                            } catch (error) {
+                              console.error("Error refreshing tasks:", error);
+                            }
+                          };
+
+                          fetchUpdatedDependencies();
                         }}
                       />
                     )}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Check, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   Command,
@@ -19,6 +19,7 @@ type Task = {
   id: string;
   title: string;
   status: string;
+  user_id?: string;
 };
 
 type Dependency = {
@@ -42,6 +43,7 @@ export default function TaskDependencySelector({
   const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
   const [dependencies, setDependencies] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchValue, setSearchValue] = useState("");
 
   const supabase = createClient();
 
@@ -53,7 +55,7 @@ export default function TaskDependencySelector({
         // Fetch all tasks except the current one
         const { data: tasksData, error: tasksError } = await supabase
           .from("tasks")
-          .select("id, title, status")
+          .select("id, title, status, user_id")
           .eq("user_id", userId)
           .neq("id", taskId);
 
@@ -76,7 +78,7 @@ export default function TaskDependencySelector({
           );
           const { data: depTasksData, error: depTasksError } = await supabase
             .from("tasks")
-            .select("id, title, status")
+            .select("id, title, status, user_id")
             .in("id", dependencyIds);
 
           if (depTasksError) throw depTasksError;
@@ -97,7 +99,7 @@ export default function TaskDependencySelector({
     if (taskId && userId) {
       fetchData();
     }
-  }, [taskId, userId, supabase]);
+  }, [taskId, userId]);
 
   const addDependency = async (dependencyTaskId: string) => {
     try {
@@ -211,22 +213,35 @@ export default function TaskDependencySelector({
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            Add Dependency
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs w-full justify-between"
+            role="combobox"
+            aria-expanded={open}
+          >
+            <span>Select dependencies...</span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-0" align="start">
+        <PopoverContent className="p-0 w-[300px]" align="start">
           <Command>
-            <CommandInput placeholder="Search tasks..." />
+            <CommandInput
+              placeholder="Search tasks..."
+              value={searchValue}
+              onValueChange={setSearchValue}
+            />
             <CommandList>
               <CommandEmpty>No tasks found.</CommandEmpty>
               <CommandGroup>
                 {filteredAvailableTasks.map((task) => (
                   <CommandItem
                     key={task.id}
+                    value={task.id}
                     onSelect={() => {
                       addDependency(task.id);
                       setOpen(false);
+                      setSearchValue("");
                     }}
                     className="flex items-center justify-between"
                   >
