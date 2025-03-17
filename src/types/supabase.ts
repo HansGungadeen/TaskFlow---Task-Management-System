@@ -9,11 +9,50 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      task_dependencies: {
+        Row: {
+          created_at: string | null
+          dependency_task_id: string
+          dependent_task_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          dependency_task_id: string
+          dependent_task_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          dependency_task_id?: string
+          dependent_task_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_dependency_task_id_fkey"
+            columns: ["dependency_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_dependent_task_id_fkey"
+            columns: ["dependent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           created_at: string
           description: string | null
+          due_date: string | null
           id: string
+          priority: string | null
+          reminder_sent: boolean | null
           status: string
           title: string
           updated_at: string
@@ -22,7 +61,10 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
+          priority?: string | null
+          reminder_sent?: boolean | null
           status?: string
           title: string
           updated_at?: string
@@ -31,7 +73,10 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
+          priority?: string | null
+          reminder_sent?: boolean | null
           status?: string
           title?: string
           updated_at?: string
