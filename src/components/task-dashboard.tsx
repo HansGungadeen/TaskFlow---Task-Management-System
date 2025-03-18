@@ -21,6 +21,7 @@ import {
   Bell,
   Link,
   AlertTriangle,
+  History,
 } from "lucide-react";
 import {
   Dialog,
@@ -896,6 +897,8 @@ type TaskCardProps = {
   onStatusChange: (id: string, status: "todo" | "in_progress" | "done") => void;
 };
 
+import TaskHistory from "./task-history";
+
 function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
@@ -975,6 +978,7 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
             </div>
           </div>
           <div className="flex space-x-1">
+            <TaskHistory taskId={task.id} taskTitle={task.title} />
             <Button variant="ghost" size="icon" onClick={onEdit}>
               <Edit className="h-4 w-4" />
             </Button>
