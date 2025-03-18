@@ -43,12 +43,23 @@ import {
 import { useTheme } from "next-themes";
 import DueDateFilter from "./due-date-filter";
 import TaskDependencySelector from "./task-dependency-selector";
+import SubtaskList from "./subtask-list";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+
+type Subtask = {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+};
 
 type Task = {
   id: string;
@@ -62,6 +73,9 @@ type Task = {
   has_dependencies?: boolean;
   dependencies_completed?: boolean;
   user_id?: string;
+  subtasks?: Subtask[];
+  subtasks_count?: number;
+  completed_subtasks_count?: number;
 };
 
 type TaskDashboardProps = {
@@ -107,9 +121,9 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
     fetchUserData();
   }, [supabase.auth]);
 
-  // Fetch task dependencies
+  // Fetch task dependencies and subtasks
   useEffect(() => {
-    const fetchTaskDependencies = async () => {
+    const fetchTaskDependenciesAndSubtasks = async () => {
       if (tasks.length === 0) return;
 
       try {
@@ -124,6 +138,17 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
             );
 
         if (dependenciesError) throw dependenciesError;
+
+        // Get subtask counts for all tasks
+        const { data: subtasksData, error: subtasksError } = await supabase
+          .from("subtasks")
+          .select("task_id, completed")
+          .in(
+            "task_id",
+            tasks.map((task) => task.id),
+          );
+
+        if (subtasksError) throw subtasksError;
 
         // Organize dependencies by dependent task
         const dependencies: Record<string, string[]> = {};
@@ -150,11 +175,28 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
 
         setDependencyStatus(status);
 
-        // Update tasks with dependency information
+        // Calculate subtask counts for each task
+        const subtaskCounts: Record<
+          string,
+          { total: number; completed: number }
+        > = {};
+        subtasksData?.forEach((subtask) => {
+          if (!subtaskCounts[subtask.task_id]) {
+            subtaskCounts[subtask.task_id] = { total: 0, completed: 0 };
+          }
+          subtaskCounts[subtask.task_id].total += 1;
+          if (subtask.completed) {
+            subtaskCounts[subtask.task_id].completed += 1;
+          }
+        });
+
+        // Update tasks with dependency and subtask information
         const updatedTasks = tasks.map((task) => ({
           ...task,
           has_dependencies: dependencies[task.id]?.length > 0,
           dependencies_completed: status[task.id] || false,
+          subtasks_count: subtaskCounts[task.id]?.total || 0,
+          completed_subtasks_count: subtaskCounts[task.id]?.completed || 0,
         }));
 
         // Only update if there are actual changes to prevent infinite loops
@@ -164,11 +206,11 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
           setTasks(updatedTasks);
         }
       } catch (error) {
-        console.error("Error fetching task dependencies:", error);
+        console.error("Error fetching task dependencies and subtasks:", error);
       }
     };
 
-    fetchTaskDependencies();
+    fetchTaskDependenciesAndSubtasks();
   }, [tasks.length]);
 
   // Apply filters when tasks or dueDateFilter changes
@@ -696,6 +738,43 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
                     )}
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subtasks">Subtasks</Label>
+                  <div className="mt-1">
+                    {currentTask && (
+                      <SubtaskList
+                        taskId={currentTask.id}
+                        userId={userData?.user?.id || ""}
+                        onSubtasksChange={() => {
+                          // Fetch updated tasks without causing a re-render loop
+                          const fetchUpdatedTasks = async () => {
+                            try {
+                              const { data: updatedTasksData } = await supabase
+                                .from("tasks")
+                                .select("*")
+                                .eq("user_id", userData?.user?.id || "");
+
+                              if (updatedTasksData) {
+                                // Only update if there are actual changes
+                                const hasChanges =
+                                  JSON.stringify(updatedTasksData) !==
+                                  JSON.stringify(tasks);
+                                if (hasChanges) {
+                                  setTasks(updatedTasksData);
+                                }
+                              }
+                            } catch (error) {
+                              console.error("Error refreshing tasks:", error);
+                            }
+                          };
+
+                          fetchUpdatedTasks();
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
             )}
             <div className="flex justify-end">
@@ -899,7 +978,11 @@ type TaskCardProps = {
 
 import TaskHistory from "./task-history";
 
+import TaskViewCard from "./task-view-card";
+
 function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
+  const [viewTaskOpen, setViewTaskOpen] = useState(false);
+  const hasSubtasks = task.subtasks_count && task.subtasks_count > 0;
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
       case "low":
@@ -930,117 +1013,163 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
   const isBlocked =
     hasDependencies && !dependenciesCompleted && task.status !== "done";
 
+  const handleSubtasksChange = () => {
+    // Refresh the task data when subtasks change
+    if (onStatusChange) {
+      // This is a hack to refresh the task data without changing the status
+      onStatusChange(task.id, task.status);
+    }
+  };
+
   return (
-    <Card
-      className={
-        isOverdue ? "border-red-500" : isDueSoon ? "border-yellow-500" : ""
-      }
-    >
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{task.title}</CardTitle>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {task.priority && (
-                <span
-                  className={`text-xs px-2 py-1 rounded-full inline-block ${getPriorityColor(task.priority)}`}
-                >
-                  {task.priority.charAt(0).toUpperCase() +
-                    task.priority.slice(1)}
-                </span>
-              )}
-              {isOverdue && (
-                <span className="text-xs px-2 py-1 rounded-full inline-block bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                  Overdue
-                </span>
-              )}
-              {isDueSoon && (
-                <span className="text-xs px-2 py-1 rounded-full inline-block bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                  Due Soon
-                </span>
-              )}
-              {isBlocked && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs px-2 py-1 rounded-full inline-block bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 flex items-center gap-1">
-                        <Link className="h-3 w-3" /> Blocked
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        This task has dependencies that are not completed yet
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+    <>
+      <Card
+        className={
+          isOverdue ? "border-red-500" : isDueSoon ? "border-yellow-500" : ""
+        }
+      >
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle
+                className="text-lg cursor-pointer hover:text-primary transition-colors"
+                onClick={() => setViewTaskOpen(true)}
+              >
+                {task.title}
+              </CardTitle>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {task.priority && (
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full inline-block ${getPriorityColor(task.priority)}`}
+                  >
+                    {task.priority.charAt(0).toUpperCase() +
+                      task.priority.slice(1)}
+                  </span>
+                )}
+                {isOverdue && (
+                  <span className="text-xs px-2 py-1 rounded-full inline-block bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                    Overdue
+                  </span>
+                )}
+                {isDueSoon && (
+                  <span className="text-xs px-2 py-1 rounded-full inline-block bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                    Due Soon
+                  </span>
+                )}
+                {isBlocked && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs px-2 py-1 rounded-full inline-block bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 flex items-center gap-1">
+                          <Link className="h-3 w-3" /> Blocked
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          This task has dependencies that are not completed yet
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {hasSubtasks && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="text-xs px-2 py-1 rounded-full inline-block bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 flex items-center gap-1 cursor-pointer"
+                          onClick={() => setViewTaskOpen(true)}
+                        >
+                          Subtasks {task.completed_subtasks_count}/
+                          {task.subtasks_count}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {task.completed_subtasks_count} of{" "}
+                          {task.subtasks_count} subtasks completed
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+            <div className="flex space-x-1">
+              <TaskHistory taskId={task.id} taskTitle={task.title} />
+              <Button variant="ghost" size="icon" onClick={onEdit}>
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onDelete}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <div className="flex space-x-1">
-            <TaskHistory taskId={task.id} taskTitle={task.title} />
-            <Button variant="ghost" size="icon" onClick={onEdit}>
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-gray-500 min-h-[40px]">
-          {task.description || "No description"}
-        </p>
-        {task.due_date && (
-          <p
-            className={`text-xs mt-2 ${isOverdue ? "text-red-500 font-medium" : isDueSoon ? "text-yellow-600 font-medium" : "text-gray-500"}`}
-          >
-            Due:{" "}
-            {new Date(task.due_date).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+        </CardHeader>
+        <CardContent
+          className="cursor-pointer"
+          onClick={() => setViewTaskOpen(true)}
+        >
+          <p className="text-sm text-gray-500 min-h-[40px]">
+            {task.description || "No description"}
           </p>
-        )}
-      </CardContent>
-      <CardFooter className="flex justify-between pt-2 border-t">
-        <div className="text-xs text-gray-500">
-          {new Date(task.created_at).toLocaleDateString("en-US")}
-        </div>
-        <div className="flex items-center gap-2">
-          {isBlocked && task.status !== "done" && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>This task has dependencies that are not completed yet</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          {task.due_date && (
+            <p
+              className={`text-xs mt-2 ${isOverdue ? "text-red-500 font-medium" : isDueSoon ? "text-yellow-600 font-medium" : "text-gray-500"}`}
+            >
+              Due:{" "}
+              {new Date(task.due_date).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
           )}
-          <Select
-            value={task.status}
-            onValueChange={(value: "todo" | "in_progress" | "done") =>
-              onStatusChange(task.id, value)
-            }
-          >
-            <SelectTrigger className="h-8 w-[130px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todo">To Do</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex justify-between pt-2 border-t">
+          <div className="text-xs text-gray-500">
+            {new Date(task.created_at).toLocaleDateString("en-US")}
+          </div>
+          <div className="flex items-center gap-2">
+            {isBlocked && task.status !== "done" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>This task has dependencies that are not completed yet</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Select
+              value={task.status}
+              onValueChange={(value: "todo" | "in_progress" | "done") =>
+                onStatusChange(task.id, value)
+              }
+            >
+              <SelectTrigger className="h-8 w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todo">To Do</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardFooter>
+      </Card>
+
+      <TaskViewCard
+        task={task}
+        isOpen={viewTaskOpen}
+        onClose={() => setViewTaskOpen(false)}
+        onSubtasksChange={handleSubtasksChange}
+      />
+    </>
   );
 }
