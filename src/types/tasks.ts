@@ -11,6 +11,13 @@ export type Subtask = {
   user_id: string;
 };
 
+export interface AssigneeData {
+  id: string;
+  email: string;
+  name?: string;
+  avatar_url?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -24,6 +31,8 @@ export interface Task {
   dependencies_completed?: boolean;
   user_id: string;
   team_id?: string | null;
+  assigned_to?: string | null;
+  assignee_data?: AssigneeData | null;
   subtasks?: Subtask[];
   subtasks_count?: number;
   completed_subtasks_count?: number;

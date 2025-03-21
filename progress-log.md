@@ -16,6 +16,7 @@
 - Due date assignment and editing
 - Task filtering by due date (Today, Tomorrow, This Week, Overdue)
 - Grid and List view modes
+- Task assignment to specific team members
 
 ### Subtasks
 - Create, edit, and delete subtasks for any task
@@ -33,6 +34,13 @@
 - Track changes to tasks (status, priority, due date)
 - View task history in a modal
 - Timestamp and user tracking for all changes
+
+### Team Collaboration
+- Create and manage teams
+- Role-based permissions (admin, member, viewer)
+- Team task assignment and member access control
+- Assign tasks to specific team members
+- Filter tasks by assignee
 
 ### UI/UX Features
 - Responsive design for all screen sizes
@@ -54,6 +62,8 @@
 - subtasks - Smaller tasks belonging to a parent task
 - task_dependencies - Relationships between tasks (which tasks depend on others)
 - task_history - Record of all changes made to tasks
+- teams - Team organization and management
+- team_members - User membership and roles within teams
 
 ## Technical Implementation
 
@@ -76,9 +86,9 @@
 - Immediate reflection of status changes
 
 ## Future Enhancements
-- Team collaboration features
 - File attachments for tasks
 - Calendar view for due dates
 - Advanced filtering and sorting options
 - Mobile app version
 - Email notifications for task assignments and updates
+- Task completion analytics and reporting

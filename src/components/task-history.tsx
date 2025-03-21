@@ -33,10 +33,16 @@ type TaskHistoryEntry = {
   task_id: string;
   user_id: string;
   action_type: "create" | "update" | "delete";
-  field_name: string;
+  field_name: string | null;
   old_value: string | null;
   new_value: string | null;
   created_at: string;
+  assigned_to: string | null;
+  change_type: string | null;
+  assignee_data?: {
+    name?: string | null;
+    email?: string | null;
+  } | null;
   user?: {
     name: string | null;
     full_name: string | null;
@@ -62,31 +68,85 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
     console.log("Fetching task history for task:", taskId);
     setLoading(true);
     try {
-      // Fetch task history without trying to join user information
+      // Fetch task history
       const { data, error } = await supabaseRef.current
         .from("task_history")
         .select("*")
         .eq("task_id", taskId)
         .order("created_at", { ascending: sortDirection === "asc" });
 
-      // If we need user information, we can fetch it separately
+      if (error) throw error;
+      
       if (data && data.length > 0) {
-        const userIds = [...new Set(data.map((entry) => entry.user_id))];
+        // Get user IDs for entries created by users
+        const userIds = data
+          .map((entry) => entry.user_id)
+          .filter((id, index, self) => self.indexOf(id) === index);
+        
+        // Get assigned user IDs - check both assigned_to and new_value fields for assignment entries
+        const assigneeIds = data
+          .filter(entry => 
+            (entry.change_type === 'assignment' && entry.assigned_to) || 
+            (entry.field_name === 'assigned_to' && entry.new_value))
+          .map(entry => entry.assigned_to || entry.new_value)
+          .filter((id, index, self) => 
+            id && typeof id === 'string' && 
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) && 
+            self.indexOf(id) === index
+          ) as string[];
+        
+        console.log("Assignee IDs to fetch:", assigneeIds);
+        
+        // Fetch user data
         const { data: userData, error: userError } = await supabaseRef.current
           .from("users")
           .select("id, name, full_name, email")
           .in("id", userIds);
 
+        // Fetch assignee data
+        let assigneeData: any[] = [];
+        if (assigneeIds.length > 0) {
+          const { data: assignees, error: assigneeError } = await supabaseRef.current
+            .from("users")
+            .select("id, name, full_name, email")
+            .in("id", assigneeIds);
+          
+          if (!assigneeError && assignees) {
+            assigneeData = assignees;
+            console.log("Fetched assignee data:", assignees);
+          }
+        }
+
         if (!userError && userData) {
           // Add user information to each history entry
           data.forEach((entry) => {
-            entry.user =
-              userData.find((user) => user.id === entry.user_id) || null;
+            // Set user who made the change
+            entry.user = userData.find((user) => user.id === entry.user_id) || null;
+            
+            // For assignment entries, set assignee data
+            if (entry.change_type === 'assignment' && entry.assigned_to) {
+              const assignee = assigneeData.find(user => user.id === entry.assigned_to);
+              if (assignee) {
+                entry.assignee_data = {
+                  name: assignee.full_name || assignee.name,
+                  email: assignee.email
+                };
+              }
+            } 
+            // Also handle regular field updates to assigned_to
+            else if (entry.field_name === 'assigned_to' && entry.new_value) {
+              const assignee = assigneeData.find(user => user.id === entry.new_value);
+              if (assignee) {
+                entry.assignee_data = {
+                  name: assignee.full_name || assignee.name,
+                  email: assignee.email
+                };
+              }
+            }
           });
         }
       }
 
-      if (error) throw error;
       console.log("Task history data received:", data);
       setHistory(data || []);
     } catch (error) {
@@ -102,9 +162,14 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
     }
   }, [open, sortDirection, taskId, fetchHistory]);
 
-  const formatValue = (value: string | null) => {
+  const formatValue = (value: string | null): string | React.ReactNode => {
     if (value === null) return "None";
     if (value === "") return "Empty";
+
+    // Check if it's a UUID (likely a user ID from assigned_to field)
+    if (value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return "User ID: " + value.substring(0, 8) + "...";
+    }
 
     // Check if it's a JSON string
     try {
@@ -151,7 +216,9 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
     }
   };
 
-  const getFieldLabel = (field: string) => {
+  const getFieldLabel = (field: string | null) => {
+    if (!field) return "Unknown Field";
+    
     switch (field) {
       case "title":
         return "Title";
@@ -165,6 +232,10 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
         return "Due Date";
       case "task":
         return "Task";
+      case "assigned_to":
+        return "Assigned To";
+      case "change_type":
+        return "Change Type";
       default:
         return field.charAt(0).toUpperCase() + field.slice(1);
     }
@@ -189,9 +260,12 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
     ? history.filter((entry) => entry.field_name === filter)
     : history;
 
-  const uniqueFields = [
-    ...new Set(history.map((entry) => entry.field_name)),
-  ].filter(Boolean);
+  // Get unique fields without using Set iteration
+  const uniqueFields = history
+    .map((entry) => entry.field_name)
+    .filter((field, index, self) => 
+      field && self.indexOf(field) === index
+    ) as string[];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -262,80 +336,100 @@ export default function TaskHistory({ taskId, taskTitle }: TaskHistoryProps) {
 
         <div className="py-4">
           {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex flex-col space-y-2">
-                  <div className="flex justify-between">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-4 w-[120px]" />
-                  </div>
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ))}
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
             </div>
           ) : filteredHistory.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No history records found for this task.
+            <div className="text-center text-muted-foreground py-4">
+              No history records found.
             </div>
           ) : (
-            <div className="space-y-6">
-              {filteredHistory.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="border rounded-lg p-4 space-y-2 bg-card"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={getActionColor(entry.action_type)}
-                        variant="outline"
-                      >
-                        {entry.action_type.charAt(0).toUpperCase() +
-                          entry.action_type.slice(1)}
-                      </Badge>
-                      <span className="font-medium">
-                        {getFieldLabel(entry.field_name)}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <div>{format(parseISO(entry.created_at), "PPp")}</div>
-                      <div className="text-right">{getUserName(entry)}</div>
-                    </div>
-                  </div>
-
-                  {entry.action_type === "create" ||
-                  entry.action_type === "delete" ? (
-                    <div className="bg-muted p-3 rounded-md text-sm">
-                      {entry.action_type === "create" ? (
-                        <div>
-                          <div className="font-medium mb-1">
-                            Created with values:
-                          </div>
-                          {formatValue(entry.new_value)}
+            <div className="space-y-4">
+              {filteredHistory.map((entry) => {
+                // Special handling for assignment changes
+                if (entry.change_type === 'assignment' || entry.field_name === 'assigned_to') {
+                  console.log("Assignment entry:", entry);
+                  
+                  // Improve assignee name extraction
+                  let assigneeName = "a user";
+                  
+                  if (entry.assignee_data && entry.assignee_data.name) {
+                    assigneeName = entry.assignee_data.name;
+                  } else if (entry.assignee_data && entry.assignee_data.email) {
+                    assigneeName = entry.assignee_data.email;
+                  } else if (entry.assigned_to || entry.new_value) {
+                    const userId = entry.assigned_to || entry.new_value;
+                    if (typeof userId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+                      assigneeName = "User ID: " + userId.substring(0, 8) + "...";
+                    } else if (entry.new_value) {
+                      const formattedValue = formatValue(entry.new_value);
+                      assigneeName = typeof formattedValue === 'string' ? formattedValue : "a user";
+                    }
+                  }
+                  
+                  return (
+                    <div key={entry.id} className="border rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge className={getActionColor(entry.action_type)}>
+                            {entry.action_type}
+                          </Badge>
+                          <span className="font-medium">Assignment Change</span>
                         </div>
-                      ) : (
-                        <div>
-                          <div className="font-medium mb-1">
-                            Deleted values:
-                          </div>
-                          {formatValue(entry.old_value)}
-                        </div>
+                        <time className="text-xs text-muted-foreground">
+                          {format(new Date(entry.created_at), "MMM d, yyyy h:mm a")}
+                        </time>
+                      </div>
+                      <p className="text-sm mt-2">
+                        <span className="font-medium">{getUserName(entry)}</span>{" "}
+                        {(entry.assigned_to || entry.new_value) 
+                          ? `assigned the task to ${assigneeName}`
+                          : "unassigned the task"}
+                      </p>
+                    </div>
+                  );
+                }
+                
+                // Default rendering for other entry types
+                return (
+                  <div key={entry.id} className="border rounded-lg p-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge className={getActionColor(entry.action_type)}>
+                          {entry.action_type}
+                        </Badge>
+                        <span className="font-medium">
+                          {getFieldLabel(entry.field_name)}
+                        </span>
+                      </div>
+                      <time className="text-xs text-muted-foreground">
+                        {format(new Date(entry.created_at), "MMM d, yyyy h:mm a")}
+                      </time>
+                    </div>
+                    <p className="text-sm mt-2">
+                      <span className="font-medium">{getUserName(entry)}</span>{" "}
+                      {entry.action_type === "create"
+                        ? "created the task"
+                        : entry.action_type === "delete"
+                        ? "deleted the task"
+                        : "changed the value from"}{" "}
+                      {entry.action_type === "update" && (
+                        <>
+                          <span className="px-1 py-0.5 bg-red-100 dark:bg-red-900 rounded">
+                            {formatValue(entry.old_value)}
+                          </span>{" "}
+                          to{" "}
+                          <span className="px-1 py-0.5 bg-green-100 dark:bg-green-900 rounded">
+                            {formatValue(entry.new_value)}
+                          </span>
+                        </>
                       )}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-muted p-3 rounded-md text-sm">
-                        <div className="font-medium mb-1">Previous value:</div>
-                        <div>{formatValue(entry.old_value)}</div>
-                      </div>
-                      <div className="bg-muted p-3 rounded-md text-sm">
-                        <div className="font-medium mb-1">New value:</div>
-                        <div>{formatValue(entry.new_value)}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

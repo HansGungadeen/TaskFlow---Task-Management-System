@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   History,
   Users,
+  Calendar,
 } from "lucide-react";
 import {
   Dialog,
@@ -53,6 +54,9 @@ import {
 } from "./ui/tooltip";
 import TeamSelector from "./team-selector";
 import { Badge } from "./ui/badge";
+import UserAssignmentSelector from "./user-assignment-selector";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { AssigneeData, Task as TaskType, TaskStatus, TaskPriority } from "@/types/tasks";
 
 type Subtask = {
   id: string;
@@ -64,23 +68,7 @@ type Subtask = {
   user_id: string;
 };
 
-type Task = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: "todo" | "in_progress" | "done";
-  priority: "low" | "medium" | "high" | "urgent" | null;
-  created_at: string;
-  due_date: string | null;
-  reminder_sent: boolean | null;
-  has_dependencies?: boolean;
-  dependencies_completed?: boolean;
-  user_id?: string;
-  team_id?: string | null;
-  subtasks?: Subtask[];
-  subtasks_count?: number;
-  completed_subtasks_count?: number;
-};
+type Task = TaskType;
 
 type Team = {
   id: string;
@@ -102,14 +90,16 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
-    status: "todo" as const,
-    priority: "medium" as const,
+    status: "todo" as TaskStatus,
+    priority: "medium" as TaskPriority,
     due_date: null as string | null,
     team_id: null as string | null,
+    assigned_to: null as string | null,
   });
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dueDateFilter, setDueDateFilter] = useState<string | null>(null);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [taskDependencies, setTaskDependencies] = useState<
     Record<string, string[]>
@@ -121,6 +111,7 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
 
   const supabase = createClient();
   const [userData, setUserData] = useState<any>(null);
+  const [teamMembers, setTeamMembers] = useState<Record<string, AssigneeData[]>>({});
 
   // Set isClient to true once component mounts and fetch user data
   useEffect(() => {
@@ -134,7 +125,7 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
     fetchUserData();
   }, [supabase.auth]);
 
-  // Fetch task dependencies and subtasks
+  // Fetch task dependencies, subtasks, and assignee data
   useEffect(() => {
     const fetchTaskDependenciesAndSubtasks = async () => {
       if (tasks.length === 0) return;
@@ -162,6 +153,33 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
           );
 
         if (subtasksError) throw subtasksError;
+        
+        // Get assignee data for assigned tasks
+        const assignedTaskIds = tasks
+          .filter(task => task.assigned_to)
+          .map(task => task.assigned_to);
+          
+        if (assignedTaskIds.length > 0) {
+          const { data: assigneesData, error: assigneesError } = await supabase
+            .from("users")
+            .select("id, email, name, avatar_url")
+            .in("id", assignedTaskIds as string[]);
+            
+          if (assigneesError) throw assigneesError;
+          
+          // Create a map of user IDs to user data
+          const assigneeMap = (assigneesData || []).reduce((acc, user) => {
+            acc[user.id] = user;
+            return acc;
+          }, {} as Record<string, AssigneeData>);
+          
+          // Update tasks with assignee data
+          tasks.forEach(task => {
+            if (task.assigned_to && assigneeMap[task.assigned_to]) {
+              task.assignee_data = assigneeMap[task.assigned_to];
+            }
+          });
+        }
 
         // Organize dependencies by dependent task
         const dependencies: Record<string, string[]> = {};
@@ -270,15 +288,61 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
     
     // Apply team filter if set
     if (teamFilter) {
-      if (teamFilter === "personal") {
-        filtered = filtered.filter((task) => !task.team_id);
+      filtered = filtered.filter((task) => task.team_id === teamFilter);
+    }
+    
+    // Apply assignee filter if set
+    if (assigneeFilter) {
+      if (assigneeFilter === 'unassigned') {
+        filtered = filtered.filter((task) => !task.assigned_to);
+      } else if (assigneeFilter === 'mine') {
+        filtered = filtered.filter((task) => task.assigned_to === userId);
       } else {
-        filtered = filtered.filter((task) => task.team_id === teamFilter);
+        filtered = filtered.filter((task) => task.assigned_to === assigneeFilter);
       }
     }
     
     setFilteredTasks(filtered);
-  }, [tasks, dueDateFilter, teamFilter]);
+  }, [tasks, dueDateFilter, teamFilter, assigneeFilter, userId]);
+
+  // Fetch team members when a team is selected
+  useEffect(() => {
+    const fetchTeamMembers = async (teamId: string) => {
+      if (teamMembers[teamId]) return; // Already fetched
+      
+      try {
+        const { data, error } = await supabase
+          .from("team_members_with_users")
+          .select("*")
+          .eq("team_id", teamId);
+
+        if (error) throw error;
+
+        if (data) {
+          const members: AssigneeData[] = data.map(member => ({
+            id: member.user_id,
+            email: member.user_email || '',
+            name: member.user_name || undefined,
+            avatar_url: member.user_avatar_url || undefined
+          }));
+          
+          setTeamMembers(prev => ({
+            ...prev,
+            [teamId]: members
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+      }
+    };
+
+    // Fetch members for tasks with teams
+    tasks.forEach(task => {
+      if (task.team_id && !teamMembers[task.team_id]) {
+        fetchTeamMembers(task.team_id);
+      }
+    });
+  }, [tasks, teamMembers, supabase]);
 
   // Function to send reminders manually
   const sendReminders = async () => {
@@ -314,28 +378,25 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
     if (!newTask.title.trim()) return;
 
     try {
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!userData.user) throw new Error("User not authenticated");
-
       const { data, error } = await supabase
         .from("tasks")
         .insert([
           {
-            title: newTask.title,
-            description: newTask.description || null,
+            title: newTask.title.trim(),
+            description: newTask.description.trim() || null,
             status: newTask.status,
             priority: newTask.priority,
             due_date: newTask.due_date,
             team_id: newTask.team_id,
-            user_id: userData.user.id,
+            assigned_to: newTask.assigned_to,
+            user_id: userId,
           },
         ])
         .select();
 
       if (error) throw error;
-      if (data) {
+
+      if (data && data[0]) {
         setTasks([data[0], ...tasks]);
         setNewTask({
           title: "",
@@ -344,6 +405,7 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
           priority: "medium",
           due_date: null,
           team_id: null,
+          assigned_to: null,
         });
         setIsCreating(false);
       }
@@ -353,23 +415,26 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
   };
 
   const handleUpdateTask = async () => {
-    if (!currentTask) return;
+    if (!currentTask || !currentTask.title.trim()) return;
 
     try {
       const { data, error } = await supabase
         .from("tasks")
         .update({
-          title: currentTask.title,
-          description: currentTask.description,
+          title: currentTask.title.trim(),
+          description: currentTask.description?.trim() || null,
           status: currentTask.status,
           priority: currentTask.priority,
           due_date: currentTask.due_date,
+          team_id: currentTask.team_id,
+          assigned_to: currentTask.assigned_to,
         })
         .eq("id", currentTask.id)
         .select();
 
       if (error) throw error;
-      if (data) {
+
+      if (data && data[0]) {
         setTasks(
           tasks.map((task) => (task.id === currentTask.id ? data[0] : task)),
         );
@@ -502,6 +567,249 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
     );
   }
 
+  // Get initials for avatar fallback
+  const getInitials = (task: Task): string => {
+    if (!task.assignee_data) return 'UN';
+    
+    if (task.assignee_data.name) {
+      return task.assignee_data.name
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+    }
+    
+    return task.assignee_data.email.substring(0, 2).toUpperCase();
+  };
+
+  // Render task form (new or edit)
+  const renderTaskForm = () => {
+    const isNewTask = !isEditing;
+    const task = isNewTask ? newTask : currentTask;
+    const setTask = isNewTask
+      ? setNewTask
+      : (updates: Partial<Task>) =>
+          setCurrentTask((prev) => ({ ...prev!, ...updates }));
+    const handleSubmit = isNewTask ? handleCreateTask : handleUpdateTask;
+
+    if (!task) return null;
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-title`}>
+            Title
+          </Label>
+          <Input
+            id={`${isNewTask ? "new" : "edit"}-task-title`}
+            value={task.title}
+            onChange={(e) => setTask({ ...task, title: e.target.value })}
+            placeholder="Enter task title"
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-description`}>
+            Description
+          </Label>
+          <Textarea
+            id={`${isNewTask ? "new" : "edit"}-task-description`}
+            value={task.description || ""}
+            onChange={(e) =>
+              setTask({ ...task, description: e.target.value })
+            }
+            placeholder="Enter task description"
+            className="mt-1"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-status`}>
+              Status
+            </Label>
+            <Select
+              value={task.status}
+              onValueChange={(value) =>
+                setTask({
+                  ...task,
+                  status: value as TaskStatus,
+                })
+              }
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todo">To Do</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-priority`}>
+              Priority
+            </Label>
+            <Select
+              value={task.priority || "medium"}
+              onValueChange={(value) =>
+                setTask({
+                  ...task,
+                  priority: value as TaskPriority,
+                })
+              }
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-due-date`}>
+            Due Date
+          </Label>
+          <Input
+            id={`${isNewTask ? "new" : "edit"}-task-due-date`}
+            type="date"
+            value={task.due_date || ""}
+            onChange={(e) => setTask({ ...task, due_date: e.target.value })}
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-team`}>
+            Team
+          </Label>
+          <TeamSelector
+            teams={userTeams}
+            value={task.team_id}
+            onChange={(teamId) => setTask({ ...task, team_id: teamId, assigned_to: null })}
+          />
+        </div>
+
+        {task.team_id && (
+          <div>
+            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-assignee`}>
+              Assigned To
+            </Label>
+            <UserAssignmentSelector 
+              teamId={task.team_id}
+              value={task.assigned_to || null}
+              onChange={(userId) => setTask({ ...task, assigned_to: userId })}
+            />
+          </div>
+        )}
+
+        {/* Show dependencies and subtasks only in edit mode */}
+        {!isNewTask && currentTask && (
+          <>
+            <div>
+              <Label htmlFor="edit-dependencies">Task Dependencies</Label>
+              <div className="mt-1">
+                <TaskDependencySelector
+                  taskId={currentTask.id}
+                  userId={userId || ""}
+                  onDependenciesChange={() => {
+                    // Fetch updated task dependencies without causing a re-render loop
+                    const fetchUpdatedDependencies = async () => {
+                      try {
+                        const { data: updatedTasksData } = await supabase
+                          .from("tasks")
+                          .select("*")
+                          .eq("user_id", userId || "");
+
+                        if (updatedTasksData) {
+                          // Only update if there are actual changes
+                          const hasChanges =
+                            JSON.stringify(updatedTasksData) !==
+                            JSON.stringify(tasks);
+                          if (hasChanges) {
+                            setTasks(updatedTasksData);
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error refreshing tasks:", error);
+                      }
+                    };
+
+                    fetchUpdatedDependencies();
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-subtasks">Subtasks</Label>
+              <div className="mt-1">
+                <SubtaskList
+                  taskId={currentTask.id}
+                  userId={userId || ""}
+                  onSubtasksChange={() => {
+                    // Fetch updated tasks without causing a re-render loop
+                    const fetchUpdatedTasks = async () => {
+                      try {
+                        const { data: updatedTasksData } = await supabase
+                          .from("tasks")
+                          .select("*")
+                          .eq("user_id", userId || "");
+
+                        if (updatedTasksData) {
+                          // Only update if there are actual changes
+                          const hasChanges =
+                            JSON.stringify(updatedTasksData) !==
+                            JSON.stringify(tasks);
+                          if (hasChanges) {
+                            setTasks(updatedTasksData);
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error refreshing tasks:", error);
+                      }
+                    };
+
+                    fetchUpdatedTasks();
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (isNewTask) {
+                setIsCreating(false);
+              } else {
+                setIsEditing(false);
+                setCurrentTask(null);
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit}>
+            {isNewTask ? "Create Task" : "Update Task"}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 bg-background text-foreground">
       <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center">
@@ -580,85 +888,7 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
             <DialogHeader>
               <DialogTitle>Create New Task</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  placeholder="Task title"
-                  value={newTask.title}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, title: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Task description"
-                  value={newTask.description}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, description: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={newTask.status}
-                  onValueChange={(value: "todo" | "in_progress" | "done") =>
-                    setNewTask({ ...newTask, status: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={newTask.priority}
-                  onValueChange={(
-                    value: "low" | "medium" | "high" | "urgent",
-                  ) => setNewTask({ ...newTask, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="due-date">Due Date</Label>
-                <Input
-                  id="due-date"
-                  type="datetime-local"
-                  onChange={(e) =>
-                    setNewTask({
-                      ...newTask,
-                      due_date: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
-                    })
-                  }
-                />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleCreateTask}>Create Task</Button>
-            </div>
+            {renderTaskForm()}
           </DialogContent>
         </Dialog>
 
@@ -667,169 +897,7 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
             <DialogHeader>
               <DialogTitle>Edit Task</DialogTitle>
             </DialogHeader>
-            {currentTask && (
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-title">Title</Label>
-                  <Input
-                    id="edit-title"
-                    value={currentTask.title}
-                    onChange={(e) =>
-                      setCurrentTask({ ...currentTask, title: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={currentTask.description || ""}
-                    onChange={(e) =>
-                      setCurrentTask({
-                        ...currentTask,
-                        description: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select
-                    value={currentTask.status}
-                    onValueChange={(value: "todo" | "in_progress" | "done") =>
-                      setCurrentTask({ ...currentTask, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todo">To Do</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-priority">Priority</Label>
-                  <Select
-                    value={currentTask.priority || "medium"}
-                    onValueChange={(
-                      value: "low" | "medium" | "high" | "urgent",
-                    ) => setCurrentTask({ ...currentTask, priority: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-due-date">Due Date</Label>
-                  <Input
-                    id="edit-due-date"
-                    type="datetime-local"
-                    value={
-                      currentTask.due_date
-                        ? new Date(currentTask.due_date)
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setCurrentTask({
-                        ...currentTask,
-                        due_date: e.target.value
-                          ? new Date(e.target.value).toISOString()
-                          : null,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-dependencies">Task Dependencies</Label>
-                  <div className="mt-1">
-                    {currentTask && (
-                      <TaskDependencySelector
-                        taskId={currentTask.id}
-                        userId={userData?.user?.id || ""}
-                        onDependenciesChange={() => {
-                          // Fetch updated task dependencies without causing a re-render loop
-                          const fetchUpdatedDependencies = async () => {
-                            try {
-                              const { data: updatedTasksData } = await supabase
-                                .from("tasks")
-                                .select("*")
-                                .eq("user_id", userData?.user?.id || "");
-
-                              if (updatedTasksData) {
-                                // Only update if there are actual changes
-                                const hasChanges =
-                                  JSON.stringify(updatedTasksData) !==
-                                  JSON.stringify(tasks);
-                                if (hasChanges) {
-                                  setTasks(updatedTasksData);
-                                }
-                              }
-                            } catch (error) {
-                              console.error("Error refreshing tasks:", error);
-                            }
-                          };
-
-                          fetchUpdatedDependencies();
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-subtasks">Subtasks</Label>
-                  <div className="mt-1">
-                    {currentTask && (
-                      <SubtaskList
-                        taskId={currentTask.id}
-                        userId={userData?.user?.id || ""}
-                        onSubtasksChange={() => {
-                          // Fetch updated tasks without causing a re-render loop
-                          const fetchUpdatedTasks = async () => {
-                            try {
-                              const { data: updatedTasksData } = await supabase
-                                .from("tasks")
-                                .select("*")
-                                .eq("user_id", userData?.user?.id || "");
-
-                              if (updatedTasksData) {
-                                // Only update if there are actual changes
-                                const hasChanges =
-                                  JSON.stringify(updatedTasksData) !==
-                                  JSON.stringify(tasks);
-                                if (hasChanges) {
-                                  setTasks(updatedTasksData);
-                                }
-                              }
-                            } catch (error) {
-                              console.error("Error refreshing tasks:", error);
-                            }
-                          };
-
-                          fetchUpdatedTasks();
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="flex justify-end">
-              <Button onClick={handleUpdateTask}>Update Task</Button>
-            </div>
+            {renderTaskForm()}
           </DialogContent>
         </Dialog>
       </div>
