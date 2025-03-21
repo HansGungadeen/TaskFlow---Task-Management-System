@@ -22,6 +22,7 @@ import {
   Link,
   AlertTriangle,
   History,
+  Users,
 } from "lucide-react";
 import {
   Dialog,
@@ -50,6 +51,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import TeamSelector from "./team-selector";
+import { Badge } from "./ui/badge";
 
 type Subtask = {
   id: string;
@@ -73,16 +76,24 @@ type Task = {
   has_dependencies?: boolean;
   dependencies_completed?: boolean;
   user_id?: string;
+  team_id?: string | null;
   subtasks?: Subtask[];
   subtasks_count?: number;
   completed_subtasks_count?: number;
 };
 
-type TaskDashboardProps = {
-  initialTasks: Task[];
+type Team = {
+  id: string;
+  name: string;
 };
 
-export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
+type TaskDashboardProps = {
+  initialTasks: Task[];
+  userTeams?: Team[];
+  userId?: string;
+};
+
+export default function TaskDashboard({ initialTasks, userTeams = [], userId }: TaskDashboardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>(initialTasks);
   const [isCreating, setIsCreating] = useState(false);
@@ -94,9 +105,11 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
     status: "todo" as const,
     priority: "medium" as const,
     due_date: null as string | null,
+    team_id: null as string | null,
   });
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dueDateFilter, setDueDateFilter] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [taskDependencies, setTaskDependencies] = useState<
     Record<string, string[]>
@@ -213,63 +226,59 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
     fetchTaskDependenciesAndSubtasks();
   }, [tasks.length]);
 
-  // Apply filters when tasks or dueDateFilter changes
+  // Apply filters when tasks, dueDateFilter, or teamFilter changes
   useEffect(() => {
-    if (!dueDateFilter) {
-      setFilteredTasks(tasks);
-      return;
+    let filtered = tasks;
+    
+    // Apply due date filter if set
+    if (dueDateFilter) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      if (dueDateFilter === "today") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate >= today && taskDate < tomorrow;
+        });
+      } else if (dueDateFilter === "tomorrow") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          const nextDay = new Date(tomorrow);
+          nextDay.setDate(nextDay.getDate() + 1);
+          return taskDate >= tomorrow && taskDate < nextDay;
+        });
+      } else if (dueDateFilter === "week") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate >= today && taskDate < nextWeek;
+        });
+      } else if (dueDateFilter === "overdue") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate < today && task.status !== "done";
+        });
+      }
     }
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
-    let filtered;
-    if (dueDateFilter === "today") {
-      filtered = tasks.filter((task) => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        return taskDate >= today && taskDate < tomorrow;
-      });
-    } else if (dueDateFilter === "tomorrow") {
-      filtered = tasks.filter((task) => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        const nextDay = new Date(tomorrow);
-        nextDay.setDate(nextDay.getDate() + 1);
-        return taskDate >= tomorrow && taskDate < nextDay;
-      });
-    } else if (dueDateFilter === "week") {
-      filtered = tasks.filter((task) => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        return taskDate >= today && taskDate < nextWeek;
-      });
-    } else if (dueDateFilter === "overdue") {
-      filtered = tasks.filter((task) => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        return taskDate < today && task.status !== "done";
-      });
-    } else if (dueDateFilter.startsWith("custom:")) {
-      const customDate = new Date(dueDateFilter.substring(7));
-      const nextDay = new Date(customDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-
-      filtered = tasks.filter((task) => {
-        if (!task.due_date) return false;
-        const taskDate = new Date(task.due_date);
-        return taskDate >= customDate && taskDate < nextDay;
-      });
-    } else {
-      filtered = tasks;
+    
+    // Apply team filter if set
+    if (teamFilter) {
+      if (teamFilter === "personal") {
+        filtered = filtered.filter((task) => !task.team_id);
+      } else {
+        filtered = filtered.filter((task) => task.team_id === teamFilter);
+      }
     }
-
+    
     setFilteredTasks(filtered);
-  }, [tasks, dueDateFilter]);
+  }, [tasks, dueDateFilter, teamFilter]);
 
   // Function to send reminders manually
   const sendReminders = async () => {
@@ -319,6 +328,7 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
             status: newTask.status,
             priority: newTask.priority,
             due_date: newTask.due_date,
+            team_id: newTask.team_id,
             user_id: userData.user.id,
           },
         ])
@@ -333,6 +343,7 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
           status: "todo",
           priority: "medium",
           due_date: null,
+          team_id: null,
         });
         setIsCreating(false);
       }
@@ -519,7 +530,46 @@ export default function TaskDashboard({ initialTasks }: TaskDashboardProps) {
           </Button>
         </div>
 
-        <DueDateFilter onFilterChange={setDueDateFilter} />
+        <div className="flex flex-col sm:flex-row justify-between gap-2 mb-6">
+          <div className="flex flex-wrap gap-2">
+            <DueDateFilter
+              value={dueDateFilter}
+              onChange={(value) => setDueDateFilter(value)}
+            />
+            
+            {userTeams && userTeams.length > 0 && (
+              <Select
+                value={teamFilter || "all"}
+                onValueChange={(value) => setTeamFilter(value === "all" ? null : value)}
+              >
+                <SelectTrigger className="h-9 w-[180px]">
+                  <SelectValue placeholder="Filter by team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tasks</SelectItem>
+                  <SelectItem value="personal">Personal Tasks</SelectItem>
+                  {userTeams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={() => {
+                setDueDateFilter(null);
+                setTeamFilter(null);
+              }}
+            >
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-1">
@@ -982,7 +1032,34 @@ import TaskViewCard from "./task-view-card";
 
 function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
   const [viewTaskOpen, setViewTaskOpen] = useState(false);
+  const [teamName, setTeamName] = useState<string | null>(null);
   const hasSubtasks = task.subtasks_count && task.subtasks_count > 0;
+  const supabase = createClient();
+  
+  // Fetch team name if task has a team
+  useEffect(() => {
+    const fetchTeamName = async () => {
+      if (task.team_id) {
+        try {
+          const { data, error } = await supabase
+            .from('teams')
+            .select('name')
+            .eq('id', task.team_id)
+            .single();
+            
+          if (error) throw error;
+          if (data) {
+            setTeamName(data.name);
+          }
+        } catch (error) {
+          console.error('Error fetching team name:', error);
+        }
+      }
+    };
+    
+    fetchTeamName();
+  }, [task.team_id, supabase]);
+  
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
       case "low":
@@ -1054,6 +1131,11 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
                 {isDueSoon && (
                   <span className="text-xs px-2 py-1 rounded-full inline-block bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
                     Due Soon
+                  </span>
+                )}
+                {teamName && (
+                  <span className="text-xs px-2 py-1 rounded-full inline-block bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                    <Users className="h-3 w-3" /> {teamName}
                   </span>
                 )}
                 {isBlocked && (

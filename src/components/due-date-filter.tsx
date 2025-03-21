@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Calendar } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -8,20 +8,34 @@ import { Calendar as CalendarComponent } from "./ui/calendar";
 import { format } from "date-fns";
 
 type DueDateFilterProps = {
-  onFilterChange: (filter: string | null) => void;
+  value?: string | null;
+  onChange: (filter: string | null) => void;
 };
 
-export default function DueDateFilter({ onFilterChange }: DueDateFilterProps) {
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+export default function DueDateFilter({ value, onChange }: DueDateFilterProps) {
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(value || null);
   const [date, setDate] = useState<Date | undefined>(undefined);
+
+  // Update selected filter when value prop changes
+  useEffect(() => {
+    setSelectedFilter(value || null);
+    
+    // If it's a custom date, parse it
+    if (value?.startsWith("custom:")) {
+      const dateStr = value.substring(7);
+      setDate(new Date(dateStr));
+    } else {
+      setDate(undefined);
+    }
+  }, [value]);
 
   const handleFilterClick = (filter: string) => {
     if (selectedFilter === filter) {
       setSelectedFilter(null);
-      onFilterChange(null);
+      onChange(null);
     } else {
       setSelectedFilter(filter);
-      onFilterChange(filter);
+      onChange(filter);
     }
   };
 
@@ -29,16 +43,16 @@ export default function DueDateFilter({ onFilterChange }: DueDateFilterProps) {
     setDate(date);
     if (date) {
       setSelectedFilter("custom");
-      onFilterChange(`custom:${date.toISOString()}`);
+      onChange(`custom:${date.toISOString()}`);
     } else {
       setSelectedFilter(null);
-      onFilterChange(null);
+      onChange(null);
     }
   };
 
   return (
     <div className="flex items-center space-x-2">
-      <div className="text-sm font-medium">Due Date:</div>
+      <div className="text-sm font-medium">Due:</div>
       <Button
         variant={selectedFilter === "today" ? "default" : "outline"}
         size="sm"
@@ -58,7 +72,7 @@ export default function DueDateFilter({ onFilterChange }: DueDateFilterProps) {
         size="sm"
         onClick={() => handleFilterClick("week")}
       >
-        This Week
+        Week
       </Button>
       <Button
         variant={selectedFilter === "overdue" ? "default" : "outline"}
@@ -87,19 +101,6 @@ export default function DueDateFilter({ onFilterChange }: DueDateFilterProps) {
           />
         </PopoverContent>
       </Popover>
-      {selectedFilter && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setSelectedFilter(null);
-            setDate(undefined);
-            onFilterChange(null);
-          }}
-        >
-          Clear
-        </Button>
-      )}
     </div>
   );
 }

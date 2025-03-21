@@ -2,34 +2,25 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
+import { Task, Subtask } from "@/types/tasks";
 import {
-  Trash2,
-  Clock,
-  CheckCircle,
-  ListTodo,
-  AlertTriangle,
-  Plus,
-  Calendar,
-  Link,
-} from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./ui/tooltip";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
 import {
   Select,
   SelectContent,
@@ -37,34 +28,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import {
+  CheckCircle,
+  Clock,
+  ListTodo,
+  Bell,
+  Calendar,
+  Link,
+  AlertTriangle,
+  Users,
+} from "lucide-react";
+import { useTheme } from "next-themes";
 import TaskDependencySelector from "./task-dependency-selector";
-
-type Subtask = {
-  id: string;
-  task_id: string;
-  title: string;
-  completed: boolean;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-};
-
-type Task = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: "todo" | "in_progress" | "done";
-  priority: "low" | "medium" | "high" | "urgent" | null;
-  created_at: string;
-  due_date: string | null;
-  reminder_sent: boolean | null;
-  has_dependencies?: boolean;
-  dependencies_completed?: boolean;
-  user_id?: string;
-  subtasks?: Subtask[];
-  subtasks_count?: number;
-  completed_subtasks_count?: number;
-};
+import {
+  Trash2,
+  Plus,
+  Edit,
+  Save,
+  X,
+} from "lucide-react";
+import { Checkbox } from "./ui/checkbox";
 
 type TaskViewCardProps = {
   task: Task | null;
@@ -80,12 +69,19 @@ export default function TaskViewCard({
   onSubtasksChange,
 }: TaskViewCardProps) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [showDependencies, setShowDependencies] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [editingDueDate, setEditingDueDate] = useState(false);
+  const [teamName, setTeamName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [newSubtask, setNewSubtask] = useState("");
-  const [editingDueDate, setEditingDueDate] = useState(false);
-  const [dueDate, setDueDate] = useState<string>("");
   const [userData, setUserData] = useState<any>(null);
   const supabase = createClient();
+  const { theme } = useTheme();
 
   // Fetch user data when component mounts
   useEffect(() => {
@@ -105,6 +101,39 @@ export default function TaskViewCard({
       setDueDate("");
     }
   }, [task]);
+
+  // Update component state when task changes
+  useEffect(() => {
+    if (task) {
+      setDescription(task.description || "");
+      setTitle(task.title);
+      setDueDate(task.due_date || "");
+      
+      // Fetch team name if task has a team_id
+      const fetchTeamName = async () => {
+        if (task.team_id) {
+          try {
+            const { data, error } = await supabase
+              .from('teams')
+              .select('name')
+              .eq('id', task.team_id)
+              .single();
+              
+            if (error) throw error;
+            if (data) {
+              setTeamName(data.name);
+            }
+          } catch (error) {
+            console.error('Error fetching team name:', error);
+          }
+        } else {
+          setTeamName(null);
+        }
+      };
+      
+      fetchTeamName();
+    }
+  }, [task, supabase]);
 
   // Function to handle toggling a subtask
   const handleToggleSubtask = async (subtaskId: string, completed: boolean) => {
@@ -371,6 +400,11 @@ export default function TaskViewCard({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                    )}
+                    {teamName && (
+                      <span className="text-xs px-2 py-1 rounded-full inline-block bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                        <Users className="h-3 w-3" /> {teamName}
+                      </span>
                     )}
                   </div>
                 </div>

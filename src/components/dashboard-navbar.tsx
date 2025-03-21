@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { UserCircle, Home, CheckSquare, Plus } from "lucide-react";
+import { UserCircle, Home, CheckSquare, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import UserProfile from "./user-profile";
@@ -38,6 +38,12 @@ export default function DashboardNavbar() {
               className="text-muted-foreground hover:text-foreground flex items-center"
             >
               <Home className="h-4 w-4 mr-1" /> Dashboard
+            </Link>
+            <Link
+              href="/teams"
+              className="text-muted-foreground hover:text-foreground flex items-center"
+            >
+              <Users className="h-4 w-4 mr-1" /> Teams
             </Link>
           </div>
         </div>
