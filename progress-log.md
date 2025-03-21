@@ -92,3 +92,6 @@
 - Mobile app version
 - Email notifications for task assignments and updates
 - Task completion analytics and reporting
+
+# start chat like this
+- read the current project and get up to speed on all the feature implemented
