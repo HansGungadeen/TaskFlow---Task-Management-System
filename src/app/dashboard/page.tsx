@@ -6,7 +6,11 @@ import { createClient } from "../../../supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default async function Dashboard() {
+export default async function Dashboard({ 
+  searchParams 
+}: { 
+  searchParams?: { [key: string]: string | string[] | undefined } 
+}) {
   const supabase = await createClient();
 
   const {
@@ -16,6 +20,12 @@ export default async function Dashboard() {
   if (!user) {
     return redirect("/sign-in");
   }
+  
+  // Get the team ID from search params if present
+  const teamId = searchParams?.team as string | undefined;
+  
+  // Log for debugging
+  console.log("Dashboard loaded with teamId:", teamId);
 
   // Fetch user's tasks
   const { data: tasks } = await supabase
@@ -78,6 +88,7 @@ export default async function Dashboard() {
               initialTasks={tasks || []} 
               userTeams={userTeams}
               userId={user.id}
+              initialTeamFilter={teamId}
             />
           </section>
         </div>

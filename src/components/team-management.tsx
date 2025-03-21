@@ -60,7 +60,12 @@ import {
   PlusCircle,
   UserCog,
   Building2,
+  ExternalLink,
+  Mail,
+  ChevronRight
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type TeamWithRole = Team & {
   memberRole?: TeamRole;
@@ -77,6 +82,7 @@ export default function TeamManagement({
   memberTeams,
   currentUserId,
 }: TeamManagementProps) {
+  const router = useRouter();
   const [teams, setTeams] = useState<Team[]>(ownedTeams);
   const [teamsAsMember, setTeamsAsMember] = useState<TeamWithRole[]>(memberTeams);
   const [isCreating, setIsCreating] = useState(false);
@@ -403,9 +409,127 @@ export default function TeamManagement({
     setIsViewingMembers(true);
   };
 
+  const handleViewTeam = (teamId: string) => {
+    router.push(`/teams/${teamId}`);
+  };
+
+  const handleViewInbox = (teamId: string) => {
+    router.push(`/teams/${teamId}/inbox`);
+  };
+
   if (!isClient) {
     return <div>Loading...</div>;
   }
+
+  // Render team card function
+  const renderTeamCard = (team: Team | TeamWithRole, isOwned = true) => {
+    const role = 'memberRole' in team ? team.memberRole : 'admin';
+    
+    return (
+      <Card key={team.id} className="hover:shadow-md transition-shadow">
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-xl">{team.name}</CardTitle>
+            <div className="flex items-center gap-1">
+              <Button 
+                size="sm" 
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => handleViewTeam(team.id)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          {team.description && (
+            <CardDescription>{team.description}</CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+            <Users className="h-4 w-4" />
+            <span>Role: <span className="capitalize">{role}</span></span>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewInbox(team.id)}
+              className="h-8 flex items-center gap-1"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              <span>Inbox</span>
+            </Button>
+            <Button 
+              size="sm"
+              variant="outline"
+              onClick={() => handleViewTeam(team.id)}
+              className="h-8 flex items-center gap-1"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Details</span>
+            </Button>
+          </div>
+
+          {isOwned && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCurrentTeam(team as Team);
+                  setIsViewingMembers(true);
+                  loadTeamMembers(team.id);
+                }}
+                className="h-8"
+              >
+                <UserCog className="h-4 w-4 mr-1" />
+                <span>Members</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCurrentTeam(team as Team);
+                  setIsEditing(true);
+                }}
+                className="h-8"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the team, and all associated members 
+                      will lose access. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleDeleteTeam(team.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete Team
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </CardFooter>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -490,72 +614,7 @@ export default function TeamManagement({
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teams.map((team) => (
-                <Card key={team.id} className="overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <CardTitle>{team.name}</CardTitle>
-                    {team.description && (
-                      <CardDescription>{team.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="text-sm pb-2">
-                    <div className="flex flex-col gap-2">
-                      <span className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto"
-                          onClick={() => viewTeamMembers(team)}
-                        >
-                          Manage Team Members
-                        </Button>
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Created:{" "}
-                        {new Date(team.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between pt-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setCurrentTeam(team);
-                        setIsEditing(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            Delete {team.name}?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete the team and remove all
-                            members. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteTeam(team.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardFooter>
-                </Card>
-              ))}
+              {teams.map((team) => renderTeamCard(team))}
             </div>
           )}
         </TabsContent>
@@ -573,54 +632,7 @@ export default function TeamManagement({
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {teamsAsMember.map((team) => (
-                <Card key={team.id} className="overflow-hidden">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <CardTitle>{team.name}</CardTitle>
-                      {team.memberRole && <RoleBadge role={team.memberRole} />}
-                    </div>
-                    {team.description && (
-                      <CardDescription>{team.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground pb-2">
-                    <div className="flex flex-col gap-2">
-                      <span>
-                        {team.memberRole && (
-                          <div className="text-xs">
-                            Your permissions:
-                            <ul className="list-disc list-inside mt-1 ml-2">
-                              {Object.entries(ROLE_PERMISSIONS[team.memberRole])
-                                .filter(([_, value]) => value)
-                                .map(([key]) => (
-                                  <li key={key}>
-                                    {key
-                                      .replace(/([A-Z])/g, " $1")
-                                      .replace(/^./, (str) => str.toUpperCase())
-                                      .replace("Can ", "")}
-                                  </li>
-                                ))}
-                            </ul>
-                          </div>
-                        )}
-                      </span>
-                      <span className="text-xs">
-                        Joined: {new Date(team.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-2">
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => viewTeamMembers(team)}
-                    >
-                      View Team
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+              {teamsAsMember.map((team) => renderTeamCard(team, false))}
             </div>
           )}
         </TabsContent>

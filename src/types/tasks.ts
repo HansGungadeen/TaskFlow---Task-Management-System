@@ -18,6 +18,12 @@ export interface AssigneeData {
   avatar_url?: string;
 }
 
+export interface StatusUpdate {
+  status: TaskStatus;
+  updated_at: string;
+  user_id?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -25,6 +31,7 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   created_at: string;
+  updated_at?: string;
   due_date: string | null;
   reminder_sent: boolean | null;
   has_dependencies?: boolean;
@@ -36,4 +43,5 @@ export interface Task {
   subtasks?: Subtask[];
   subtasks_count?: number;
   completed_subtasks_count?: number;
+  status_updates?: StatusUpdate[];
 } 
