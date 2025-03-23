@@ -54,6 +54,8 @@ import {
   X,
 } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import TaskComments from "./task-comments";
 
 type TaskViewCardProps = {
   task: Task | null;
@@ -345,252 +347,285 @@ export default function TaskViewCard({
     !task?.dependencies_completed &&
     task?.status !== "done";
 
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose();
-        }
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Task Details</DialogTitle>
-        </DialogHeader>
+  // Function to handle editing description
+  const handleEditDescription = () => {
+    setEditingDescription(true);
+  };
 
+  // Function to handle updating description
+  const handleUpdateDescription = async () => {
+    if (!task) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ description })
+        .eq("id", task.id);
+
+      if (error) throw error;
+      setEditingDescription(false);
+    } catch (error) {
+      console.error("Error updating description:", error);
+    }
+  };
+
+  // Function to handle updating priority
+  const handlePriorityChange = async (priority: string) => {
+    if (!task) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ priority })
+        .eq("id", task.id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error updating priority:", error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl w-full">
         {task && (
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <div>
-                  <CardTitle className="text-lg">{task.title}</CardTitle>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {task.priority && (
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full inline-block ${getPriorityColor(task.priority)}`}
-                      >
-                        {task.priority.charAt(0).toUpperCase() +
-                          task.priority.slice(1)}
-                      </span>
-                    )}
-                    {isOverdue && (
-                      <span className="text-xs px-2 py-1 rounded-full inline-block bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
-                        Overdue
-                      </span>
-                    )}
-                    {isDueSoon && (
-                      <span className="text-xs px-2 py-1 rounded-full inline-block bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
-                        Due Soon
-                      </span>
-                    )}
-                    {isBlocked && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-xs px-2 py-1 rounded-full inline-block bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 flex items-center gap-1">
-                              Blocked
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              This task has dependencies that are not completed
-                              yet
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {teamName && (
-                      <span className="text-xs px-2 py-1 rounded-full inline-block bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300 flex items-center gap-1">
-                        <Users className="h-3 w-3" /> {teamName}
-                      </span>
-                    )}
+            <DialogHeader>
+              <DialogTitle>{task.title}</DialogTitle>
+            </DialogHeader>
+
+            <Tabs defaultValue="details">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="comments">Comments</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-medium">Description</h3>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditDescription()}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
                   </div>
+                  {editingDescription ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Add a description..."
+                        className="min-h-[100px]"
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingDescription(false);
+                            setDescription(task.description || "");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleUpdateDescription}>
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-secondary/30 p-3 rounded-md text-sm min-h-[50px]">
+                      {task.description || "No description"}
+                    </div>
+                  )}
                 </div>
-              </CardHeader>
 
-              <CardContent>
-                <p className="text-sm text-gray-500">
-                  {task.description || "No description"}
-                </p>
-                {task.due_date && (
-                  <p
-                    className={`text-xs mt-2 ${isOverdue ? "text-red-500 font-medium" : isDueSoon ? "text-yellow-600 font-medium" : "text-gray-500"}`}
-                  >
-                    Due:{" "}
-                    {new Date(task.due_date).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                )}
-              </CardContent>
-
-              <CardFooter className="flex flex-col space-y-3 pt-2 border-t">
-                <div className="flex justify-between w-full items-center">
-                  <div className="text-xs text-gray-500">
-                    Created:{" "}
-                    {new Date(task.created_at).toLocaleDateString("en-US")}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(task.status)}
+                {/* Status, Priority, Due Date */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="status">Status</Label>
                       <Select
                         value={task.status}
-                        onValueChange={(
-                          value: "todo" | "in_progress" | "done",
-                        ) => handleStatusChange(value)}
+                        onValueChange={(value: "todo" | "in_progress" | "done") =>
+                          handleStatusChange(value)
+                        }
+                        disabled={task.has_dependencies && !task.dependencies_completed}
                       >
-                        <SelectTrigger className="h-8 w-[130px]">
+                        <SelectTrigger id="status" className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="todo">To Do</SelectItem>
-                          <SelectItem value="in_progress">
-                            In Progress
-                          </SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
                           <SelectItem value="done">Done</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between w-full items-center">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm">Due Date:</span>
-                  </div>
-                  {editingDueDate ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="datetime-local"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                        className="h-8 w-[200px]"
-                      />
-                      <Button size="sm" onClick={handleUpdateDueDate}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingDueDate(false)}
+                    <div>
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select
+                        value={task.priority || "medium"}
+                        onValueChange={handlePriorityChange}
                       >
-                        Cancel
-                      </Button>
+                        <SelectTrigger id="priority" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : (
+                  </div>
+
+                  <div>
+                    <Label htmlFor="due-date">Due Date</Label>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">
-                        {task.due_date
-                          ? new Date(task.due_date).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )
-                          : "Not set"}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingDueDate(true)}
-                      >
-                        Edit
-                      </Button>
+                      {editingDueDate ? (
+                        <>
+                          <Input
+                            id="due-date"
+                            type="datetime-local"
+                            value={dueDate}
+                            onChange={(e) => setDueDate(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button variant="ghost" size="sm" onClick={handleUpdateDueDate}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingDueDate(false);
+                              setDueDate(task.due_date || "");
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex-1 text-sm">
+                            {task.due_date
+                              ? new Date(task.due_date).toLocaleString()
+                              : "No due date set"}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingDueDate(true)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {teamName && (
+                    <div className="flex justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Users className="h-4 w-4" /> Team
+                      </Label>
+                      <span className="text-sm">{teamName}</span>
                     </div>
                   )}
                 </div>
-              </CardFooter>
-            </Card>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <h3 className="text-md font-medium">Subtasks</h3>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Add new subtask"
-                    value={newSubtask}
-                    onChange={(e) => setNewSubtask(e.target.value)}
-                    className="h-8 w-[200px]"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddSubtask();
-                      }
-                    }}
-                  />
-                  <Button size="sm" onClick={handleAddSubtask}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                {/* Subtasks */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-md font-medium">Subtasks</h3>
+                  </div>
 
-              {isLoading ? (
-                <div className="text-sm text-gray-500">Loading subtasks...</div>
-              ) : subtasks.length === 0 ? (
-                <div className="text-sm text-gray-500 py-2">
-                  No subtasks for this task
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {subtasks.map((subtask) => (
-                    <div
-                      key={subtask.id}
-                      className="flex items-center justify-between py-1 px-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`view-subtask-${subtask.id}`}
-                          checked={subtask.completed}
-                          onCheckedChange={(checked) =>
-                            handleToggleSubtask(subtask.id, checked === true)
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a subtask..."
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newSubtask.trim()) {
+                            handleAddSubtask();
                           }
-                        />
-                        <Label
-                          htmlFor={`view-subtask-${subtask.id}`}
-                          className={`text-sm ${subtask.completed ? "line-through text-gray-500" : ""}`}
-                        >
-                          {subtask.title}
-                        </Label>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteSubtask(subtask.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        }}
+                        className="flex-1"
+                      />
+                      <Button onClick={handleAddSubtask} disabled={!newSubtask.trim()}>
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                    {isLoading ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground">
+                        Loading subtasks...
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {subtasks.map((subtask) => (
+                          <div
+                            key={subtask.id}
+                            className="flex items-center justify-between p-2 bg-secondary/30 rounded-md"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`view-subtask-${subtask.id}`}
+                                checked={subtask.completed}
+                                onCheckedChange={(checked) =>
+                                  handleToggleSubtask(subtask.id, checked === true)
+                                }
+                              />
+                              <Label
+                                htmlFor={`view-subtask-${subtask.id}`}
+                                className={`text-sm ${subtask.completed ? "line-through text-gray-500" : ""}`}
+                              >
+                                {subtask.title}
+                              </Label>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteSubtask(subtask.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Link className="h-4 w-4 text-gray-500" />
-                <h3 className="text-md font-medium">Task Dependencies</h3>
-              </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Link className="h-4 w-4 text-gray-500" />
+                    <h3 className="text-md font-medium">Task Dependencies</h3>
+                  </div>
 
-              {task && userData?.user && (
-                <TaskDependencySelector
-                  taskId={task.id}
-                  userId={userData?.user?.id || ""}
-                  onDependenciesChange={() => {
-                    if (onSubtasksChange) onSubtasksChange();
-                  }}
-                />
-              )}
-            </div>
+                  {task && userData?.user && (
+                    <TaskDependencySelector
+                      taskId={task.id}
+                      userId={userData?.user?.id || ""}
+                      onDependenciesChange={() => {
+                        if (onSubtasksChange) onSubtasksChange();
+                      }}
+                    />
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="comments" className="pt-4">
+                {userData?.user && (
+                  <TaskComments 
+                    taskId={task.id}
+                    teamId={task.team_id ?? null}
+                    currentUser={userData.user}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
 
             <div className="flex justify-end">
               <Button variant="outline" onClick={onClose}>

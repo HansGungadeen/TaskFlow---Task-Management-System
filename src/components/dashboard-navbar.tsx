@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createClient } from "../../supabase/client";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +14,23 @@ import { UserCircle, Home, CheckSquare, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import UserProfile from "./user-profile";
+import { NotificationBell } from "./notification-bell";
 
 export default function DashboardNavbar() {
   const supabase = createClient();
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUserId(data.user.id);
+      }
+    };
+    
+    fetchUser();
+  }, [supabase.auth]);
 
   return (
     <nav className="w-full border-b border-border bg-background py-4">
@@ -51,6 +65,7 @@ export default function DashboardNavbar() {
           <Button variant="outline" className="flex items-center gap-1">
             <Plus className="h-4 w-4" /> New Task
           </Button>
+          {userId && <NotificationBell userId={userId} />}
           <ThemeToggle />
           <UserProfile />
         </div>

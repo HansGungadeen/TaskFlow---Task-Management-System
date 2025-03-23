@@ -42,6 +42,20 @@
 - Assign tasks to specific team members
 - Filter tasks by assignee
 
+### Comments and Mentions
+- Comment on tasks with rich text support
+- @mention team members in comments
+- Self-mention support with notifications
+- Real-time comment updates
+- User-friendly mention suggestions dropdown
+
+### Notifications
+- Notification center with unread count indicator
+- Mention notifications when tagged in comments
+- Task comment notifications for task owners
+- Mark notifications as read individually or all at once
+- Row Level Security for proper notification visibility
+
 ### UI/UX Features
 - Responsive design for all screen sizes
 - Dark/light theme support
@@ -64,6 +78,9 @@
 - task_history - Record of all changes made to tasks
 - teams - Team organization and management
 - team_members - User membership and roles within teams
+- task_comments - Comments on tasks with content and user information
+- comment_mentions - Records of users mentioned in comments
+- notifications - User notifications for mentions, comments and other activities
 
 ## Technical Implementation
 
@@ -79,11 +96,27 @@
 - PostgreSQL database with RLS policies
 - Supabase edge functions for background processing
 - Next.js API routes for server-side operations
+- Custom SQL functions with error handling for robust database operations
+
+### Database Features
+- Foreign key constraint handling with automatic user synchronization
+- Row Level Security (RLS) policies for data protection
+- Database triggers for user synchronization between auth and public schemas
+- Comprehensive database migrations using Supabase Migration format
 
 ### Real-time Features
 - Live updates for task changes
 - Real-time subtask management
 - Immediate reflection of status changes
+- Real-time notifications for mentions and comments
+
+## Recent Fixes
+- Fixed foreign key constraint issues with mentions and notifications
+- Implemented sync mechanism between auth.users and public.users tables
+- Improved error handling in database functions
+- Added support for self-mentions in comments
+- Fixed notification visibility with proper RLS policies
+- Created comprehensive migration system for easy deployment
 
 ## Future Enhancements
 - File attachments for tasks
