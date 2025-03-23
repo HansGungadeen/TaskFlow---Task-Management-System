@@ -29,10 +29,60 @@ export default async function Dashboard({
   console.log("Dashboard loaded with teamId:", teamId, "taskId:", taskId);
 
   // Fetch user's tasks
-  const { data: tasks } = await supabase
+  const { data: tasks, error } = await supabase
     .from("tasks")
-    .select("*")
+    .select(`
+      *,
+      subtasks (
+        id,
+        title,
+        completed
+      )
+    `)
     .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching tasks:", error);
+  }
+
+  // Get user information for assigned tasks
+  const assignedTaskIds = tasks
+    ?.filter(task => task.assigned_to)
+    .map(task => task.assigned_to) || [];
+    
+  let userMap: Record<string, any> = {};
+  
+  if (assignedTaskIds.length > 0) {
+    const { data: assignedUsers } = await supabase
+      .from("users")
+      .select("id, email, name, avatar_url")
+      .in("id", assignedTaskIds as string[]);
+      
+    if (assignedUsers) {
+      userMap = assignedUsers.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {} as Record<string, any>);
+    }
+  }
+  
+  // Add assignee data to tasks
+  const processedTasks = tasks?.map(task => {
+    // Add assignee_data if task is assigned
+    const assignee_data = task.assigned_to && userMap[task.assigned_to] 
+      ? {
+          id: userMap[task.assigned_to].id,
+          email: userMap[task.assigned_to].email,
+          name: userMap[task.assigned_to].name || null,
+          avatar_url: userMap[task.assigned_to].avatar_url || null
+        }
+      : null;
+      
+    return {
+      ...task,
+      assignee_data
+    };
+  }) || [];
 
   // Fetch user's teams (teams they created or are a member of)
   const { data: ownedTeams } = await supabase
@@ -86,7 +136,7 @@ export default async function Dashboard({
           {/* Task Dashboard Section */}
           <section className="bg-card rounded-xl p-6 border shadow-sm">
             <TaskDashboard 
-              initialTasks={tasks || []} 
+              initialTasks={processedTasks} 
               userTeams={userTeams}
               userId={user.id}
               initialTeamFilter={teamId}

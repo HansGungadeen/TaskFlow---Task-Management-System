@@ -1305,8 +1305,31 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
           )}
         </CardContent>
         <CardFooter className="flex justify-between pt-2 border-t">
-          <div className="text-xs text-gray-500">
-            {new Date(task.created_at).toLocaleDateString("en-US")}
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-gray-500">
+              {new Date(task.created_at).toLocaleDateString("en-US")}
+            </div>
+            {task.assignee_data && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={task.assignee_data.avatar_url || ""} />
+                        <AvatarFallback className="text-[10px]">
+                          {task.assignee_data.name 
+                            ? task.assignee_data.name.charAt(0).toUpperCase() 
+                            : task.assignee_data.email.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Assigned to: {task.assignee_data.name || task.assignee_data.email}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {isBlocked && task.status !== "done" && (

@@ -43,6 +43,7 @@ import {
   Link,
   AlertTriangle,
   Users,
+  UserCircle,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import TaskDependencySelector from "./task-dependency-selector";
@@ -525,14 +526,30 @@ export default function TaskViewCard({
                     </div>
                   </div>
 
-                  {teamName && (
-                    <div className="flex justify-between">
+                  {/* Team and Assigned To in a grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <Label className="flex items-center gap-2">
                         <Users className="h-4 w-4" /> Team
                       </Label>
-                      <span className="text-sm">{teamName}</span>
+                      <div className="mt-1 text-sm">
+                        {teamName || "No team"}
+                      </div>
                     </div>
-                  )}
+                    
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <UserCircle className="h-4 w-4" /> Assigned To
+                      </Label>
+                      <div className="mt-1 text-sm">
+                        {task.assignee_data ? (
+                          task.assignee_data.name || task.assignee_data.email || "Unknown User"
+                        ) : (
+                          "Unassigned"
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Subtasks */}

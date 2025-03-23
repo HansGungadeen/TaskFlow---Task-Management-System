@@ -10,15 +10,17 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { UserCircle, Home, CheckSquare, Plus, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import UserProfile from "./user-profile";
 import { NotificationBell } from "./notification-bell";
+import { cn } from "@/lib/utils";
 
 export default function DashboardNavbar() {
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
   const [userId, setUserId] = useState<string | null>(null);
   
   useEffect(() => {
@@ -49,20 +51,41 @@ export default function DashboardNavbar() {
           <div className="hidden md:flex space-x-6 ml-8">
             <Link
               href="/dashboard"
-              className="text-muted-foreground hover:text-foreground flex items-center"
+              className={cn(
+                "hover:text-foreground flex items-center",
+                pathname === "/dashboard" 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
             >
               <Home className="h-4 w-4 mr-1" /> Dashboard
             </Link>
             <Link
+              href="/dashboard/kanban"
+              className={cn(
+                "hover:text-foreground flex items-center",
+                pathname === "/dashboard/kanban" 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+            </Link>
+            <Link
               href="/teams"
-              className="text-muted-foreground hover:text-foreground flex items-center"
+              className={cn(
+                "hover:text-foreground flex items-center",
+                pathname.startsWith("/teams") 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
             >
               <Users className="h-4 w-4 mr-1" /> Teams
             </Link>
           </div>
         </div>
         <div className="flex gap-4 items-center">
-          <Button variant="outline" className="flex items-center gap-1">
+          <Button variant="outline" className="flex items-center gap-1" onClick={() => router.push('/dashboard')}>
             <Plus className="h-4 w-4" /> New Task
           </Button>
           {userId && <NotificationBell userId={userId} />}
