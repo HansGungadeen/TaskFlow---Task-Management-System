@@ -17,12 +17,15 @@
 - Task filtering by due date (Today, Tomorrow, This Week, Overdue)
 - Grid and List view modes
 - Task assignment to specific team members
+- In-place task editing across multiple views
 
 ### Subtasks
 - Create, edit, and delete subtasks for any task
 - Mark subtasks as complete/incomplete
 - Real-time updates with Supabase subscriptions
 - Subtask count tracking on parent tasks
+- Subtask progress visualization with completion bar
+- View and manage subtasks directly in team views
 
 ### Task Dependencies
 - Link tasks as dependencies for other tasks
@@ -41,6 +44,17 @@
 - Team task assignment and member access control
 - Assign tasks to specific team members
 - Filter tasks by assignee
+- Edit tasks directly in team detail view
+- View and manage subtasks within team interface
+- Seamless navigation between task views
+
+### Team Communication
+- Team inbox for team-wide messages
+- Link messages to specific tasks for context
+- Multi-task linking in a single message
+- Visual chips for task selection
+- Automatic task selection when navigating from task views
+- Contextual discussion of multiple tasks in a single thread
 
 ### Comments and Mentions
 - Comment on tasks with rich text support
@@ -62,6 +76,8 @@
 - Task cards with visual indicators for priority, due date, and dependencies
 - Detailed task view with all information and management options
 - Real-time updates across the application
+- Contextual navigation between related views
+- Consistent task management interface across multiple screens
 
 ### Reminders
 - Due date reminders for tasks
@@ -81,6 +97,7 @@
 - task_comments - Comments on tasks with content and user information
 - comment_mentions - Records of users mentioned in comments
 - notifications - User notifications for mentions, comments and other activities
+- team_inbox_messages - Team communication with task linkage
 
 ## Technical Implementation
 
@@ -90,6 +107,7 @@
 - Tailwind CSS for styling
 - shadcn/ui component library for consistent design
 - Client-side state management with React hooks
+- URL parameter handling for contextual navigation
 
 ### Backend
 - Supabase for authentication, database, and real-time subscriptions
@@ -109,6 +127,16 @@
 - Real-time subtask management
 - Immediate reflection of status changes
 - Real-time notifications for mentions and comments
+- Real-time team inbox communication
+
+## Recent Enhancements
+- Added in-place task editing in team detail view
+- Implemented subtask management directly in team view
+- Added subtask completion progress visualization
+- Enhanced navigation between team detail, dashboard, and inbox views
+- Implemented multi-task linking in team inbox messages
+- Created intelligent message parsing to display linked tasks
+- Improved task context preservation when navigating between views
 
 ## Recent Fixes
 - Fixed foreign key constraint issues with mentions and notifications
@@ -117,6 +145,7 @@
 - Added support for self-mentions in comments
 - Fixed notification visibility with proper RLS policies
 - Created comprehensive migration system for easy deployment
+- Fixed React hook ordering for consistent component rendering
 
 ## Future Enhancements
 - File attachments for tasks
