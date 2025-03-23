@@ -1232,7 +1232,7 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
                     <Users className="h-3 w-3" /> {teamName}
                   </span>
                 )}
-                {isBlocked && (
+                {isBlocked && task.has_dependencies && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1248,7 +1248,7 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {hasSubtasks && (
+                {hasSubtasks && task.subtasks_count && task.subtasks_count > 0 && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1289,6 +1289,25 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
           <p className="text-sm text-gray-500 min-h-[40px]">
             {task.description || "No description"}
           </p>
+          
+          {/* Subtasks progress bar */}
+          {task.subtasks_count !== undefined && task.subtasks_count > 0 && (
+            <div className="mt-2 mb-1">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>Subtasks</span>
+                <span>{task.completed_subtasks_count || 0}/{task.subtasks_count}</span>
+              </div>
+              <div className="w-full bg-secondary h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-primary h-full rounded-full transition-all" 
+                  style={{ 
+                    width: `${(task.subtasks_count > 0 ? ((task.completed_subtasks_count || 0) / task.subtasks_count) : 0) * 100}%` 
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          
           {task.due_date && (
             <p
               className={`text-xs mt-2 ${isOverdue ? "text-red-500 font-medium" : isDueSoon ? "text-yellow-600 font-medium" : "text-gray-500"}`}
