@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Team, TeamMember, TeamRole } from "@/types/teams";
-import { Task, TaskStatus } from "@/types/tasks";
+import { Task, TaskStatus, TaskPriority } from "@/types/tasks";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import {
@@ -32,7 +32,10 @@ import {
   ClipboardList,
   CheckCircle,
   AlertCircle,
-  Pencil
+  Pencil,
+  Save,
+  Plus,
+  Trash2
 } from "lucide-react";
 import {
   Dialog,
@@ -47,6 +50,12 @@ import { createClient } from "@/utils/utils";
 import { Separator } from "./ui/separator";
 import { format, parseISO } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import TeamSelector from "./team-selector";
+import UserAssignmentSelector from "./user-assignment-selector";
+import { Checkbox } from "./ui/checkbox";
 
 type TeamDetailProps = {
   team: Team;
@@ -79,6 +88,16 @@ type TaskHistoryEntry = {
   };
 };
 
+type Subtask = {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+};
+
 export default function TeamDetail({
   team,
   currentUser,
@@ -93,6 +112,15 @@ export default function TeamDetail({
   const [teamTasks, setTeamTasks] = useState(initialTeamTasks);
   const [taskHistory, setTaskHistory] = useState<TaskHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // New state variables for task editing
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editedTask, setEditedTask] = useState<Task | null>(null);
+  
+  // New state variables for subtasks
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [subtasksLoading, setSubtasksLoading] = useState(false);
+  
   const supabase = createClient();
   const supabaseRef = useRef(supabase);
 
@@ -349,6 +377,171 @@ export default function TeamDetail({
     }
   };
 
+  // Function to fetch subtasks for the selected task
+  const fetchSubtasks = async (taskId: string) => {
+    if (!taskId) return;
+    
+    try {
+      setSubtasksLoading(true);
+      const { data, error } = await supabase
+        .from("subtasks")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setSubtasks(data || []);
+    } catch (error) {
+      console.error("Error fetching subtasks:", error);
+      setSubtasks([]);
+    } finally {
+      setSubtasksLoading(false);
+    }
+  };
+
+  // Function to add a new subtask
+  const handleAddSubtask = async () => {
+    if (!selectedTask || !newSubtaskTitle.trim() || !currentUser?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("subtasks")
+        .insert([
+          {
+            task_id: selectedTask.id,
+            title: newSubtaskTitle.trim(),
+            completed: false,
+            user_id: currentUser.id,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        setSubtasks([...subtasks, data[0]]);
+        setNewSubtaskTitle("");
+        
+        // Update the task's subtask counts
+        if (selectedTask) {
+          const updatedTask = {
+            ...selectedTask,
+            subtasks_count: (selectedTask.subtasks_count || 0) + 1,
+          };
+          setSelectedTask(updatedTask);
+          
+          // Also update in the team tasks list
+          setTeamTasks(prevTasks => 
+            prevTasks.map(task => 
+              task.id === selectedTask.id ? 
+                { 
+                  ...task, 
+                  subtasks_count: (task.subtasks_count || 0) + 1 
+                } : 
+                task
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error adding subtask:", error);
+    }
+  };
+
+  // Function to toggle subtask completion status
+  const handleToggleSubtask = async (subtaskId: string, completed: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("subtasks")
+        .update({ completed })
+        .eq("id", subtaskId);
+
+      if (error) throw error;
+
+      // Update local state
+      setSubtasks(prev =>
+        prev.map(subtask =>
+          subtask.id === subtaskId ? { ...subtask, completed } : subtask
+        )
+      );
+      
+      // Update the task's completed subtask count
+      if (selectedTask) {
+        const completedCount = subtasks.filter(s => 
+          s.id === subtaskId ? completed : s.completed
+        ).length;
+        
+        const updatedTask = {
+          ...selectedTask,
+          completed_subtasks_count: completedCount
+        };
+        setSelectedTask(updatedTask);
+        
+        // Also update in the team tasks list
+        setTeamTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === selectedTask.id ? 
+              { 
+                ...task, 
+                completed_subtasks_count: completedCount 
+              } : 
+              task
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+    }
+  };
+
+  // Function to delete a subtask
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    try {
+      const { error } = await supabase
+        .from("subtasks")
+        .delete()
+        .eq("id", subtaskId);
+
+      if (error) throw error;
+
+      // Get the subtask that's being deleted to know if it was completed
+      const deletedSubtask = subtasks.find(s => s.id === subtaskId);
+      const wasCompleted = deletedSubtask?.completed || false;
+      
+      // Update local state
+      setSubtasks(prev => prev.filter(subtask => subtask.id !== subtaskId));
+      
+      // Update the task's subtask counts
+      if (selectedTask) {
+        const updatedTask = {
+          ...selectedTask,
+          subtasks_count: (selectedTask.subtasks_count || 0) - 1,
+          completed_subtasks_count: wasCompleted ? 
+            (selectedTask.completed_subtasks_count || 0) - 1 : 
+            (selectedTask.completed_subtasks_count || 0)
+        };
+        setSelectedTask(updatedTask);
+        
+        // Also update in the team tasks list
+        setTeamTasks(prevTasks => 
+          prevTasks.map(task => 
+            task.id === selectedTask.id ? 
+              { 
+                ...task, 
+                subtasks_count: (task.subtasks_count || 0) - 1,
+                completed_subtasks_count: wasCompleted ? 
+                  (task.completed_subtasks_count || 0) - 1 : 
+                  (task.completed_subtasks_count || 0)
+              } : 
+              task
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting subtask:", error);
+    }
+  };
+
   // Function to handle opening task details
   const handleViewTask = async (task: Task) => {
     let taskWithAssignee = { ...task };
@@ -406,6 +599,9 @@ export default function TeamDetail({
     
     // Fetch task history when opening the task
     fetchTaskHistory(task.id);
+    
+    // Fetch subtasks when opening the task
+    fetchSubtasks(task.id);
     
     setSelectedTask(taskWithAssignee);
     setIsTaskModalOpen(true);
@@ -471,6 +667,52 @@ export default function TeamDetail({
     } catch (error) {
       console.error('Error updating task status:', error);
       alert("Failed to update task status. Please try again.");
+    }
+  };
+
+  // New function to handle editing a task
+  const handleEditTask = (task: Task) => {
+    setEditedTask({...task});
+    setIsEditingTask(true);
+  };
+
+  // New function to handle updating a task
+  const handleUpdateTask = async () => {
+    if (!editedTask || !editedTask.title.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("tasks")
+        .update({
+          title: editedTask.title.trim(),
+          description: editedTask.description?.trim() || null,
+          status: editedTask.status,
+          priority: editedTask.priority,
+          due_date: editedTask.due_date,
+          team_id: editedTask.team_id,
+          assigned_to: editedTask.assigned_to,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editedTask.id)
+        .select();
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        // Update both the teamTasks and the selectedTask states
+        setTeamTasks(
+          teamTasks.map((task) => (task.id === editedTask.id ? data[0] : task))
+        );
+        
+        if (selectedTask && selectedTask.id === editedTask.id) {
+          setSelectedTask(data[0]);
+        }
+        
+        setIsEditingTask(false);
+        setEditedTask(null);
+      }
+    } catch (error) {
+      console.error("Error updating task:", error);
     }
   };
 
@@ -732,7 +974,11 @@ export default function TeamDetail({
         open={isTaskModalOpen}
         onOpenChange={(open) => {
           setIsTaskModalOpen(open);
-          if (!open) setSelectedTask(null);
+          if (!open) {
+            setSelectedTask(null);
+            setSubtasks([]);
+            setNewSubtaskTitle("");
+          }
         }}
       >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -853,30 +1099,96 @@ export default function TeamDetail({
                   </div>
                 </div>
 
-                {/* Subtasks Information with Progress Bar */}
-                {selectedTask.subtasks_count != null && (
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-muted-foreground mb-1">Subtasks</h3>
-                    <div className="flex flex-col gap-2">
-                      <div className="text-sm">
-                        <ClipboardList className="h-4 w-4 inline mr-1" />
-                        <span>
-                          {selectedTask.completed_subtasks_count || 0} of {selectedTask.subtasks_count} complete
-                        </span>
-                      </div>
-                      {selectedTask.subtasks_count > 0 && (
+                {/* Subtasks Section - Add this new section */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Subtasks</h3>
+                  <div className="space-y-2">
+                    {/* Progress bar for subtasks */}
+                    {subtasks.length > 0 && (
+                      <div className="mb-3">
+                        <div className="text-sm mb-1">
+                          <ClipboardList className="h-4 w-4 inline mr-1" />
+                          <span>
+                            {subtasks.filter(s => s.completed).length} of {subtasks.length} completed
+                          </span>
+                        </div>
                         <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
                           <div 
                             className="bg-green-500 h-full rounded-full"
                             style={{ 
-                              width: `${(selectedTask.completed_subtasks_count || 0) / selectedTask.subtasks_count * 100}%`
+                              width: `${(subtasks.filter(s => s.completed).length / subtasks.length) * 100}%`
                             }}
                           ></div>
                         </div>
-                      )}
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a subtask..."
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                            handleAddSubtask();
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button 
+                        size="sm"
+                        onClick={handleAddSubtask} 
+                        disabled={!newSubtaskTitle.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
+                    
+                    {subtasksLoading ? (
+                      <div className="text-center py-2">
+                        <Skeleton className="h-8 w-full mb-2" />
+                        <Skeleton className="h-8 w-full mb-2" />
+                        <Skeleton className="h-8 w-full" />
+                      </div>
+                    ) : subtasks.length === 0 ? (
+                      <div className="text-center py-2 text-sm text-muted-foreground">
+                        No subtasks yet
+                      </div>
+                    ) : (
+                      <div className="space-y-2 mt-2">
+                        {subtasks.map((subtask) => (
+                          <div
+                            key={subtask.id}
+                            className="flex items-center justify-between p-2 bg-muted/30 rounded-md"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`subtask-${subtask.id}`}
+                                checked={subtask.completed}
+                                onCheckedChange={(checked) =>
+                                  handleToggleSubtask(subtask.id, checked === true)
+                                }
+                              />
+                              <Label
+                                htmlFor={`subtask-${subtask.id}`}
+                                className={`text-sm ${subtask.completed ? "line-through text-muted-foreground" : ""}`}
+                              >
+                                {subtask.title}
+                              </Label>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteSubtask(subtask.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Dependencies Information */}
                 {selectedTask.has_dependencies && (
@@ -944,7 +1256,10 @@ export default function TeamDetail({
                         variant="outline"
                         size="sm"
                         className="justify-start"
-                        onClick={() => router.push(`/dashboard?task=${selectedTask.id}`)}
+                        onClick={() => {
+                          setIsTaskModalOpen(false);
+                          router.push(`/dashboard?taskId=${selectedTask.id}`);
+                        }}
                       >
                         <ListTodo className="h-4 w-4 mr-2" />
                         View in Dashboard
@@ -955,7 +1270,7 @@ export default function TeamDetail({
                           variant="outline"
                           size="sm"
                           className="justify-start"
-                          onClick={() => router.push(`/dashboard?edit=${selectedTask.id}`)}
+                          onClick={() => handleEditTask(selectedTask)}
                         >
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit Task
@@ -1125,6 +1440,129 @@ export default function TeamDetail({
                 </div>
               </div>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Edit Dialog */}
+      <Dialog 
+        open={isEditingTask} 
+        onOpenChange={(open) => {
+          setIsEditingTask(open);
+          if (!open) setEditedTask(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          
+          {editedTask && (
+            <div className="flex flex-col gap-4">
+              <div>
+                <Label htmlFor="edit-task-title">Title</Label>
+                <Input
+                  id="edit-task-title"
+                  value={editedTask.title}
+                  onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
+                  placeholder="Enter task title"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-task-description">Description</Label>
+                <Textarea
+                  id="edit-task-description"
+                  value={editedTask.description || ""}
+                  onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
+                  placeholder="Enter task description"
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-task-status">Status</Label>
+                  <Select
+                    value={editedTask.status}
+                    onValueChange={(value) => setEditedTask({
+                      ...editedTask,
+                      status: value as TaskStatus,
+                    })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-task-priority">Priority</Label>
+                  <Select
+                    value={editedTask.priority || "medium"}
+                    onValueChange={(value) => setEditedTask({
+                      ...editedTask,
+                      priority: value as TaskPriority,
+                    })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-task-due-date">Due Date</Label>
+                <Input
+                  id="edit-task-due-date"
+                  type="date"
+                  value={editedTask.due_date ? editedTask.due_date.substring(0, 10) : ""}
+                  onChange={(e) => {
+                    // Handle empty string as null, and ensure the type is string | null
+                    const value: string | null = e.target.value === "" ? null : e.target.value;
+                    setEditedTask({ ...editedTask, due_date: value });
+                  }}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-task-assignee">Assigned To</Label>
+                <UserAssignmentSelector 
+                  teamId={editedTask.team_id}
+                  value={editedTask.assigned_to || null}
+                  onChange={(userId) => setEditedTask({ ...editedTask, assigned_to: userId })}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditingTask(false);
+                    setEditedTask(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateTask}>
+                  Update Task
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

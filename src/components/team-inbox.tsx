@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/utils/utils";
 import { TeamMember, TeamRole } from "@/types/teams";
 import { Task } from "@/types/tasks";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -104,6 +104,7 @@ export default function TeamInbox({
   initialTasks = []
 }: TeamInboxProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   
   const [messages, setMessages] = useState<InboxMessage[]>(initialMessages);
@@ -111,7 +112,7 @@ export default function TeamInbox({
   const [isLoading, setIsLoading] = useState(initialMessages.length === 0);
   const [activeTab, setActiveTab] = useState("messages");
   const [teamTasks, setTeamTasks] = useState<Task[]>(initialTasks);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   
   // Check if user has permission to create messages
@@ -121,6 +122,16 @@ export default function TeamInbox({
   useEffect(() => {
     loadInboxMessages();
     loadTeamTasks();
+    
+    // Check if a task ID is provided in the URL
+    const taskId = searchParams.get('task');
+    if (taskId) {
+      setSelectedTaskIds([taskId]);
+      // If we're not on the messages tab, switch to it
+      if (activeTab !== "messages") {
+        setActiveTab("messages");
+      }
+    }
     
     // Set up real-time subscription for new messages
     const messagesSubscription = supabase
@@ -180,6 +191,7 @@ export default function TeamInbox({
     if (!newMessage.trim()) return;
     
     try {
+      // Always create a single message, storing task IDs as JSON if multiple
       const { data, error } = await supabase
         .from('team_inbox_messages')
         .insert([
@@ -187,14 +199,19 @@ export default function TeamInbox({
             team_id: teamId,
             user_id: currentUser.id,
             content: newMessage.trim(),
-            related_task_id: selectedTaskId,
+            related_task_id: selectedTaskIds.length > 0 ? selectedTaskIds[0] : null,
+            // Store additional task IDs in the content if there are multiple
+            // Format: original message + JSON data at the end that we'll parse when displaying
+            ...(selectedTaskIds.length > 1 && {
+              content: `${newMessage.trim()}\n\n__LINKED_TASKS__${JSON.stringify(selectedTaskIds)}`
+            })
           },
         ]);
         
       if (error) throw error;
       
       setNewMessage("");
-      setSelectedTaskId(null);
+      setSelectedTaskIds([]);
       await loadInboxMessages();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -250,6 +267,38 @@ export default function TeamInbox({
   const formatMessageDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  };
+  
+  // Parse message content for linked tasks
+  const parseMessageContent = (message: InboxMessage) => {
+    // Check if the message contains linked tasks data
+    const linkedTasksMarker = '__LINKED_TASKS__';
+    const messageContent = message.content;
+    
+    if (messageContent.includes(linkedTasksMarker)) {
+      // Split the content to separate the message and the linked tasks data
+      const [actualContent, tasksData] = messageContent.split(linkedTasksMarker);
+      
+      try {
+        // Parse the JSON string containing task IDs
+        const taskIds = JSON.parse(tasksData) as string[];
+        // Find all the tasks that match these IDs
+        const linkedTasks = teamTasks.filter(task => taskIds.includes(task.id));
+        
+        return {
+          content: actualContent.trim(),
+          linkedTasks
+        };
+      } catch (error) {
+        console.error('Error parsing linked tasks data:', error);
+      }
+    }
+    
+    // Default return if no linked tasks are found or there's an error
+    return {
+      content: messageContent,
+      linkedTasks: message.related_task ? [message.related_task] : []
+    };
   };
   
   const getUserInitials = (name?: string, email?: string) => {
@@ -325,33 +374,44 @@ export default function TeamInbox({
                 </div>
                 
                 <div className="flex justify-between items-center mt-2">
-                  <div className="flex items-center gap-2">
-                    {selectedTaskId && (
-                      <div className="flex items-center gap-2 bg-secondary px-2 py-1 rounded text-xs">
-                        <LinkIcon className="h-3 w-3" />
-                        <span>Task linked</span>
-                        <button 
-                          onClick={() => setSelectedTaskId(null)}
-                          className="hover:text-destructive"
-                        >
-                          <Trash className="h-3 w-3" />
-                        </button>
-                      </div>
-                    )}
+                  <div className="flex items-center flex-wrap gap-2">
+                    {selectedTaskIds.map(taskId => {
+                      const task = teamTasks.find(t => t.id === taskId);
+                      return task ? (
+                        <div key={taskId} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                          <LinkIcon className="h-3 w-3" />
+                          <span>{task.title}</span>
+                          <button 
+                            onClick={() => setSelectedTaskIds(prev => prev.filter(id => id !== taskId))}
+                            className="hover:text-destructive"
+                          >
+                            <Trash className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {!selectedTaskId && teamTasks.length > 0 && (
-                      <Select onValueChange={(value) => setSelectedTaskId(value)}>
+                    {teamTasks.length > 0 && (
+                      <Select
+                        onValueChange={(value) => {
+                          if (!selectedTaskIds.includes(value)) {
+                            setSelectedTaskIds(prev => [...prev, value]);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="w-[200px] h-8 text-xs">
-                          <SelectValue placeholder="Link to task" />
+                          <SelectValue placeholder="Link task" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teamTasks.map((task) => (
-                            <SelectItem key={task.id} value={task.id} className="text-xs">
-                              {task.title}
-                            </SelectItem>
-                          ))}
+                          {teamTasks
+                            .filter(task => !selectedTaskIds.includes(task.id))
+                            .map((task) => (
+                              <SelectItem key={task.id} value={task.id} className="text-xs">
+                                {task.title}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     )}
@@ -433,49 +493,54 @@ export default function TeamInbox({
                                 </div>
                               </CardHeader>
                               <CardContent className="pb-2">
-                                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                                <p className="whitespace-pre-wrap text-sm">{parseMessageContent(message).content}</p>
                                 
-                                {message.related_task && (
-                                  <div className="mt-2 p-2 bg-muted rounded-md text-xs flex items-start gap-2">
-                                    <LinkIcon className="h-3 w-3 mt-0.5" />
-                                    <div>
-                                      <div className="font-medium">{message.related_task.title}</div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <Badge 
-                                          variant="outline"
-                                          className={`text-[10px] flex items-center gap-1 ${getStatusColor(message.related_task.status)} text-white`}
-                                        >
-                                          {message.related_task.status === 'todo' && <ListTodo className="h-2 w-2" />}
-                                          {message.related_task.status === 'in_progress' && <Clock className="h-2 w-2" />}
-                                          {message.related_task.status === 'done' && <CheckCircle2 className="h-2 w-2" />}
-                                          <span>
-                                            {message.related_task.status === 'todo' ? 'To Do' : 
-                                             message.related_task.status === 'in_progress' ? 'In Progress' : 'Done'}
-                                          </span>
-                                        </Badge>
-                                        
-                                        {message.related_task.priority && (
-                                          <Badge 
-                                            variant="outline"
-                                            className={`text-[10px] ${getPriorityColor(message.related_task.priority)} text-white`}
-                                          >
-                                            {message.related_task.priority}
-                                          </Badge>
-                                        )}
-                                        
-                                        {message.related_task.due_date && (
-                                          <Badge 
-                                            variant="outline"
-                                            className="text-[10px] bg-slate-500 text-white flex items-center gap-1"
-                                          >
-                                            <Calendar className="h-2 w-2" />
-                                            <span>
-                                              {new Date(message.related_task.due_date).toLocaleDateString()}
-                                            </span>
-                                          </Badge>
-                                        )}
+                                {/* Display linked tasks */}
+                                {parseMessageContent(message).linkedTasks.length > 0 && (
+                                  <div className="mt-2 space-y-2">
+                                    {parseMessageContent(message).linkedTasks.map(task => (
+                                      <div key={task.id} className="p-2 bg-muted rounded-md text-xs flex items-start gap-2">
+                                        <LinkIcon className="h-3 w-3 mt-0.5" />
+                                        <div>
+                                          <div className="font-medium">{task.title}</div>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <Badge 
+                                              variant="outline"
+                                              className={`text-[10px] flex items-center gap-1 ${getStatusColor(task.status)} text-white`}
+                                            >
+                                              {task.status === 'todo' && <ListTodo className="h-2 w-2" />}
+                                              {task.status === 'in_progress' && <Clock className="h-2 w-2" />}
+                                              {task.status === 'done' && <CheckCircle2 className="h-2 w-2" />}
+                                              <span>
+                                                {task.status === 'todo' ? 'To Do' : 
+                                                 task.status === 'in_progress' ? 'In Progress' : 'Done'}
+                                              </span>
+                                            </Badge>
+                                            
+                                            {task.priority && (
+                                              <Badge 
+                                                variant="outline"
+                                                className={`text-[10px] ${getPriorityColor(task.priority)} text-white`}
+                                              >
+                                                {task.priority}
+                                              </Badge>
+                                            )}
+                                            
+                                            {task.due_date && (
+                                              <Badge 
+                                                variant="outline"
+                                                className="text-[10px] bg-slate-500 text-white flex items-center gap-1"
+                                              >
+                                                <Calendar className="h-2 w-2" />
+                                                <span>
+                                                  {new Date(task.due_date).toLocaleDateString()}
+                                                </span>
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
-                                    </div>
+                                    ))}
                                   </div>
                                 )}
                               </CardContent>
@@ -541,49 +606,54 @@ export default function TeamInbox({
                             </div>
                           </CardHeader>
                           <CardContent className="pb-2">
-                            <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                            <p className="whitespace-pre-wrap text-sm">{parseMessageContent(message).content}</p>
                             
-                            {message.related_task && (
-                              <div className="mt-2 p-2 bg-muted rounded-md text-xs flex items-start gap-2">
-                                <LinkIcon className="h-3 w-3 mt-0.5" />
-                                <div>
-                                  <div className="font-medium">{message.related_task.title}</div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Badge 
-                                      variant="outline"
-                                      className={`text-[10px] flex items-center gap-1 ${getStatusColor(message.related_task.status)} text-white`}
-                                    >
-                                      {message.related_task.status === 'todo' && <ListTodo className="h-2 w-2" />}
-                                      {message.related_task.status === 'in_progress' && <Clock className="h-2 w-2" />}
-                                      {message.related_task.status === 'done' && <CheckCircle2 className="h-2 w-2" />}
-                                      <span>
-                                        {message.related_task.status === 'todo' ? 'To Do' : 
-                                         message.related_task.status === 'in_progress' ? 'In Progress' : 'Done'}
-                                      </span>
-                                    </Badge>
-                                    
-                                    {message.related_task.priority && (
-                                      <Badge 
-                                        variant="outline"
-                                        className={`text-[10px] ${getPriorityColor(message.related_task.priority)} text-white`}
-                                      >
-                                        {message.related_task.priority}
-                                      </Badge>
-                                    )}
-                                    
-                                    {message.related_task.due_date && (
-                                      <Badge 
-                                        variant="outline"
-                                        className="text-[10px] bg-slate-500 text-white flex items-center gap-1"
-                                      >
-                                        <Calendar className="h-2 w-2" />
-                                        <span>
-                                          {new Date(message.related_task.due_date).toLocaleDateString()}
-                                        </span>
-                                      </Badge>
-                                    )}
+                            {/* Display linked tasks */}
+                            {parseMessageContent(message).linkedTasks.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                {parseMessageContent(message).linkedTasks.map(task => (
+                                  <div key={task.id} className="p-2 bg-muted rounded-md text-xs flex items-start gap-2">
+                                    <LinkIcon className="h-3 w-3 mt-0.5" />
+                                    <div>
+                                      <div className="font-medium">{task.title}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <Badge 
+                                          variant="outline"
+                                          className={`text-[10px] flex items-center gap-1 ${getStatusColor(task.status)} text-white`}
+                                        >
+                                          {task.status === 'todo' && <ListTodo className="h-2 w-2" />}
+                                          {task.status === 'in_progress' && <Clock className="h-2 w-2" />}
+                                          {task.status === 'done' && <CheckCircle2 className="h-2 w-2" />}
+                                          <span>
+                                            {task.status === 'todo' ? 'To Do' : 
+                                             task.status === 'in_progress' ? 'In Progress' : 'Done'}
+                                          </span>
+                                        </Badge>
+                                        
+                                        {task.priority && (
+                                          <Badge 
+                                            variant="outline"
+                                            className={`text-[10px] ${getPriorityColor(task.priority)} text-white`}
+                                          >
+                                            {task.priority}
+                                          </Badge>
+                                        )}
+                                        
+                                        {task.due_date && (
+                                          <Badge 
+                                            variant="outline"
+                                            className="text-[10px] bg-slate-500 text-white flex items-center gap-1"
+                                          >
+                                            <Calendar className="h-2 w-2" />
+                                            <span>
+                                              {new Date(task.due_date).toLocaleDateString()}
+                                            </span>
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                </div>
+                                ))}
                               </div>
                             )}
                           </CardContent>

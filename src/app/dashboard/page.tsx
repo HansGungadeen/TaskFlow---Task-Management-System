@@ -23,9 +23,10 @@ export default async function Dashboard({
   
   // Get the team ID from search params if present
   const teamId = searchParams?.team as string | undefined;
+  const taskId = searchParams?.taskId as string | undefined;
   
   // Log for debugging
-  console.log("Dashboard loaded with teamId:", teamId);
+  console.log("Dashboard loaded with teamId:", teamId, "taskId:", taskId);
 
   // Fetch user's tasks
   const { data: tasks } = await supabase
@@ -89,6 +90,7 @@ export default async function Dashboard({
               userTeams={userTeams}
               userId={user.id}
               initialTeamFilter={teamId}
+              initialTaskId={taskId}
             />
           </section>
         </div>

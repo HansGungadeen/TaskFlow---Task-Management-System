@@ -79,9 +79,17 @@ type TaskDashboardProps = {
   initialTasks: Task[];
   userTeams?: Team[];
   userId?: string;
+  initialTeamFilter?: string | null;
+  initialTaskId?: string;
 };
 
-export default function TaskDashboard({ initialTasks, userTeams = [], userId }: TaskDashboardProps) {
+export default function TaskDashboard({ 
+  initialTasks, 
+  userTeams = [], 
+  userId,
+  initialTeamFilter,
+  initialTaskId
+}: TaskDashboardProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>(initialTasks);
   const [isCreating, setIsCreating] = useState(false);
@@ -343,6 +351,24 @@ export default function TaskDashboard({ initialTasks, userTeams = [], userId }: 
       }
     });
   }, [tasks, teamMembers, supabase]);
+
+  // Set initial team filter if provided
+  useEffect(() => {
+    if (initialTeamFilter) {
+      setTeamFilter(initialTeamFilter);
+    }
+  }, [initialTeamFilter]);
+
+  // Open task if initialTaskId is provided
+  useEffect(() => {
+    if (initialTaskId && tasks.length > 0) {
+      const taskToOpen = tasks.find(task => task.id === initialTaskId);
+      if (taskToOpen) {
+        setCurrentTask(taskToOpen);
+        setIsEditing(true);
+      }
+    }
+  }, [initialTaskId, tasks]);
 
   // Function to send reminders manually
   const sendReminders = async () => {
