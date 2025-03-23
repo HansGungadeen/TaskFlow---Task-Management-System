@@ -324,7 +324,7 @@ export default function KanbanBoard({
                             )}
                             
                             {/* Subtasks progress bar */}
-                            {task.subtasks_count && task.subtasks_count > 0 && (
+                            {task.subtasks_count !== undefined && task.subtasks_count > 0 && (
                               <div className="mt-2 mb-1">
                                 <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                   <span>Subtasks</span>
@@ -334,7 +334,7 @@ export default function KanbanBoard({
                                   <div 
                                     className="bg-primary h-full rounded-full transition-all" 
                                     style={{ 
-                                      width: `${((task.completed_subtasks_count || 0) / Math.max(1, task.subtasks_count)) * 100}%` 
+                                      width: `${(task.subtasks_count > 0 ? ((task.completed_subtasks_count || 0) / task.subtasks_count) : 0) * 100}%` 
                                     }}
                                   />
                                 </div>
@@ -365,7 +365,7 @@ export default function KanbanBoard({
                                   </Badge>
                                 )}
                                 
-                                {task.subtasks_count && task.subtasks_count > 0 && (
+                                {task.subtasks_count !== undefined && task.subtasks_count > 0 && (
                                   <Badge variant="outline" className="text-xs flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
