@@ -167,13 +167,49 @@ export default function KanbanTaskView({
           }
         }
         
+        // Get time entries for the task
+        const { data: timeEntries, error: timeError } = await supabase
+          .from("time_entries")
+          .select(`
+            *,
+            users:user_id (
+              name,
+              email,
+              avatar_url
+            )
+          `)
+          .eq("task_id", taskId)
+          .order("created_at", { ascending: false });
+          
+        if (timeError) {
+          console.error("Error fetching time entries:", timeError);
+        }
+        
+        // Process time entries
+        const processedTimeEntries = timeEntries?.map((entry) => ({
+          id: entry.id,
+          task_id: entry.task_id,
+          user_id: entry.user_id,
+          hours: entry.hours,
+          description: entry.description,
+          created_at: entry.created_at,
+          user_name: entry.users?.name || "",
+          user_email: entry.users?.email || "",
+          user_avatar_url: entry.users?.avatar_url || "",
+        })) || [];
+        
+        // Calculate total time spent
+        const totalTimeSpent = processedTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
+        
         const processedTask = {
           ...data,
           subtasks_count: subtasksCount,
           completed_subtasks_count: completedSubtasksCount,
           has_dependencies: false,
           dependencies_completed: true,
-          assignee_data
+          assignee_data,
+          time_entries: processedTimeEntries,
+          time_spent: totalTimeSpent
         };
         
         setCurrentTask(processedTask);

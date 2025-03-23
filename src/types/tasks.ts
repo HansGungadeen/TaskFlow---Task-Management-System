@@ -24,6 +24,19 @@ export interface StatusUpdate {
   user_id?: string;
 }
 
+// Time tracking interface
+export interface TimeEntry {
+  id: string;
+  task_id: string;
+  user_id: string;
+  hours: number;
+  description: string | null;
+  created_at: string;
+  user_name?: string;
+  user_email?: string;
+  user_avatar_url?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -44,4 +57,6 @@ export interface Task {
   subtasks_count?: number;
   completed_subtasks_count?: number;
   status_updates?: StatusUpdate[];
+  time_spent?: number;
+  time_entries?: TimeEntry[];
 } 

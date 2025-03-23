@@ -1,25 +1,29 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
-  CommandItem,
   CommandList,
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Badge } from "./ui/badge";
 import { createClient } from "@/utils/utils";
+import { Checkbox } from "./ui/checkbox";
+import { Card } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
 
 type Task = {
   id: string;
   title: string;
   status: string;
   user_id?: string;
+  team_id?: string | null;
+  team_name?: string | null;
 };
 
 type Dependency = {
@@ -52,14 +56,69 @@ export default function TaskDependencySelector({
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch all tasks except the current one
-        const { data: tasksData, error: tasksError } = await supabase
+        // Get the user's teams
+        const { data: userTeams, error: teamsError } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", userId);
+        
+        if (teamsError) throw teamsError;
+        
+        // Create array of team IDs
+        const teamIds = userTeams ? userTeams.map(team => team.team_id) : [];
+        
+        // Fetch all tasks except the current one that the user has access to:
+        // 1. Tasks created by the user
+        // 2. Tasks assigned to the user
+        // 3. Tasks from teams the user is a member of
+        let query = supabase
           .from("tasks")
-          .select("id, title, status, user_id")
-          .eq("user_id", userId)
+          .select("id, title, status, user_id, team_id")
           .neq("id", taskId);
-
+        
+        // Build filter for: created by user OR assigned to user OR in user's teams
+        let filters = `user_id.eq.${userId},assigned_to.eq.${userId}`;
+        
+        // Add team filters if user is part of any teams
+        if (teamIds.length > 0) {
+          const teamFilters = teamIds.map(id => `team_id.eq.${id}`).join(',');
+          filters += `,${teamFilters}`;
+        }
+        
+        // Apply the combined filter
+        query = query.or(filters);
+        
+        const { data: tasksData, error: tasksError } = await query;
+        
         if (tasksError) throw tasksError;
+
+        // Get team names for all tasks with team_id
+        const tasksWithTeams = [...(tasksData || [])] as Task[];
+        const taskTeamIds = tasksWithTeams
+          .filter(task => task.team_id)
+          .map(task => task.team_id);
+          
+        if (taskTeamIds.length > 0) {
+          const { data: teamsData, error: teamsInfoError } = await supabase
+            .from("teams")
+            .select("id, name")
+            .in("id", taskTeamIds as string[]);
+            
+          if (!teamsInfoError && teamsData) {
+            // Create a map of team ids to team names
+            const teamMap: Record<string, string> = {};
+            teamsData.forEach(team => {
+              teamMap[team.id] = team.name;
+            });
+            
+            // Add team names to tasks
+            tasksWithTeams.forEach(task => {
+              if (task.team_id && teamMap[task.team_id]) {
+                task.team_name = teamMap[task.team_id];
+              }
+            });
+          }
+        }
 
         // Fetch current dependencies
         const { data: dependenciesData, error: dependenciesError } =
@@ -78,16 +137,42 @@ export default function TaskDependencySelector({
           );
           const { data: depTasksData, error: depTasksError } = await supabase
             .from("tasks")
-            .select("id, title, status, user_id")
+            .select("id, title, status, user_id, team_id")
             .in("id", dependencyIds);
 
           if (depTasksError) throw depTasksError;
           if (depTasksData) {
-            dependencyTasks.push(...depTasksData);
+            // Add team names to dependency tasks as well
+            const depTasksWithTeams = [...depTasksData] as Task[];
+            const depTeamIds = depTasksWithTeams
+              .filter(task => task.team_id)
+              .map(task => task.team_id);
+              
+            if (depTeamIds.length > 0) {
+              const { data: depTeamsData } = await supabase
+                .from("teams")
+                .select("id, name")
+                .in("id", depTeamIds as string[]);
+                
+              if (depTeamsData) {
+                const teamMap: Record<string, string> = {};
+                depTeamsData.forEach(team => {
+                  teamMap[team.id] = team.name;
+                });
+                
+                depTasksWithTeams.forEach(task => {
+                  if (task.team_id && teamMap[task.team_id]) {
+                    task.team_name = teamMap[task.team_id];
+                  }
+                });
+              }
+            }
+            
+            dependencyTasks.push(...depTasksWithTeams);
           }
         }
 
-        setAvailableTasks(tasksData || []);
+        setAvailableTasks(tasksWithTeams || []);
         setDependencies(dependencyTasks);
       } catch (error) {
         console.error("Error fetching task dependencies:", error);
@@ -182,85 +267,144 @@ export default function TaskDependencySelector({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2 mb-2">
-        {dependencies.length > 0 ? (
-          dependencies.map((task) => (
-            <Badge
-              key={task.id}
-              variant="secondary"
-              className="flex items-center gap-1"
+      {dependencies.length > 0 && (
+        <div className="space-y-2 mb-2">
+          {dependencies.map((task) => (
+            <div 
+              key={task.id} 
+              className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/50 border border-border"
             >
-              <span className="max-w-[150px] truncate">{task.title}</span>
-              <span
-                className={`text-xs px-1 rounded-full ${getStatusColor(task.status)}`}
-              >
-                {getStatusText(task.status)}
-              </span>
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <span className="flex-shrink-0 inline-block px-2 py-1 text-xs font-medium rounded-md capitalize"
+                  style={{ 
+                    backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
+                                    task.status === 'in_progress' ? '#fef3c7' : 
+                                    task.status === 'done' ? '#d1fae5' : '#f3f4f6',
+                    color: task.status === 'todo' ? '#374151' : 
+                           task.status === 'in_progress' ? '#92400e' : 
+                           task.status === 'done' ? '#065f46' : '#374151'
+                  }}
+                >
+                  {getStatusText(task.status)}
+                </span>
+                <span className="truncate text-sm font-medium">
+                  {task.title}
+                </span>
+                {task.team_name && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    ({task.team_name})
+                  </span>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-4 w-4 p-0 ml-1"
+                className="h-6 w-6 rounded-full"
                 onClick={() => removeDependency(task.id)}
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </Button>
-            </Badge>
-          ))
-        ) : (
-          <div className="text-sm text-gray-500">No dependencies set</div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {dependencies.length === 0 && (
+        <div className="text-sm text-muted-foreground mb-2">No dependencies set</div>
+      )}
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs w-full justify-between"
+            className="h-9 text-sm w-full justify-between"
             role="combobox"
             aria-expanded={open}
           >
-            <span>Select dependencies...</span>
+            <span>Select task dependencies...</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-0 w-[300px]" align="start">
-          <Command>
-            <CommandInput
-              placeholder="Search tasks..."
-              value={searchValue}
-              onValueChange={setSearchValue}
-            />
-            <CommandList>
-              <CommandEmpty>No tasks found.</CommandEmpty>
-              <CommandGroup>
-                {filteredAvailableTasks.map((task) => (
-                  <CommandItem
-                    key={task.id}
-                    value={task.id}
-                    onSelect={() => {
-                      addDependency(task.id);
-                      setOpen(false);
-                      setSearchValue("");
-                    }}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="max-w-[200px] truncate">
-                        {task.title}
-                      </span>
-                      <span
-                        className={`text-xs px-1 rounded-full ${getStatusColor(task.status)}`}
-                      >
-                        {getStatusText(task.status)}
-                      </span>
-                    </div>
-                    <Check className="h-4 w-4 opacity-0 group-data-[selected]:opacity-100" />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
+        <PopoverContent className="p-2 w-[350px]" align="start">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Command className="rounded-lg border flex-1">
+                <CommandInput 
+                  placeholder="Search tasks..." 
+                  value={searchValue} 
+                  onValueChange={setSearchValue}
+                  className="h-9"
+                />
+              </Command>
+            </div>
+            
+            {filteredAvailableTasks.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No matching tasks found
+              </div>
+            ) : (
+              <ScrollArea className="h-72">
+                <div className="space-y-2 px-1 py-2">
+                  {filteredAvailableTasks.map((task) => (
+                    <Card 
+                      key={task.id}
+                      className="p-3 hover:bg-accent cursor-pointer transition-colors"
+                      onClick={() => {
+                        addDependency(task.id);
+                        setOpen(false);
+                        setSearchValue("");
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id={`task-${task.id}`}
+                          className="mt-1"
+                          checked={false}
+                          onCheckedChange={() => {
+                            addDependency(task.id);
+                            setOpen(false);
+                            setSearchValue("");
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <label 
+                            htmlFor={`task-${task.id}`}
+                            className="text-sm font-medium block cursor-pointer"
+                          >
+                            {task.title}
+                          </label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded-md"
+                              style={{ 
+                                backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
+                                                task.status === 'in_progress' ? '#fef3c7' : 
+                                                task.status === 'done' ? '#d1fae5' : '#f3f4f6',
+                                color: task.status === 'todo' ? '#374151' : 
+                                      task.status === 'in_progress' ? '#92400e' : 
+                                      task.status === 'done' ? '#065f46' : '#374151'
+                              }}
+                            >
+                              {getStatusText(task.status)}
+                            </span>
+                            {task.team_name && (
+                              <span className="text-xs text-muted-foreground">
+                                Team: {task.team_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
         </PopoverContent>
       </Popover>
     </div>
