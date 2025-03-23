@@ -1,6 +1,6 @@
 import DashboardNavbar from "@/components/dashboard-navbar";
 import TaskDashboard from "@/components/task-dashboard";
-import { InfoIcon, UserCircle, Users } from "lucide-react";
+import { InfoIcon, UserCircle, Users, Calendar } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
 import Link from "next/link";
@@ -120,12 +120,20 @@ export default async function Dashboard({
           <header className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <h1 className="text-3xl font-bold">Task Dashboard</h1>
-              <Link href="/teams">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <span>Manage Teams</span>
-                </Button>
-              </Link>
+              <div className="flex gap-2">
+                <Link href="/dashboard/calendar">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Calendar View</span>
+                  </Button>
+                </Link>
+                <Link href="/teams">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Manage Teams</span>
+                  </Button>
+                </Link>
+              </div>
             </div>
             <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
               <InfoIcon size="14" />

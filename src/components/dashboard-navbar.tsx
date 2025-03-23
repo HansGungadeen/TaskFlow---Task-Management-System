@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid } from "lucide-react";
+import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid, Calendar } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import UserProfile from "./user-profile";
@@ -70,6 +70,17 @@ export default function DashboardNavbar() {
               )}
             >
               <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+            </Link>
+            <Link
+              href="/dashboard/calendar"
+              className={cn(
+                "hover:text-foreground flex items-center",
+                pathname === "/dashboard/calendar" 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
+            >
+              <Calendar className="h-4 w-4 mr-1" /> Calendar
             </Link>
             <Link
               href="/teams"

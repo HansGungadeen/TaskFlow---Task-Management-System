@@ -18,6 +18,7 @@
 - Grid and List view modes
 - Task assignment to specific team members
 - In-place task editing across multiple views
+- Calendar view for better scheduling and visualization
 
 ### Subtasks
 - Create, edit, and delete subtasks for any task
@@ -78,6 +79,7 @@
 - Real-time updates across the application
 - Contextual navigation between related views
 - Consistent task management interface across multiple screens
+- Multiple view options: Dashboard, Kanban, and Calendar
 
 ### Reminders
 - Due date reminders for tasks
@@ -130,6 +132,16 @@
 - Real-time team inbox communication
 
 ## Recent Enhancements
+- **Added Calendar View for better task scheduling:**
+  - Month and week view options
+  - Jira-inspired UI with color-coded task cards
+  - Date navigation with Today button
+  - Direct task creation from calendar cells
+  - Visual indicators for priorities and task status
+  - Tooltips with detailed task information
+  - Team filtering in calendar view
+  - Responsive design for all device sizes
+  - Real-time updates with Supabase subscriptions
 - Added in-place task editing in team detail view
 - Implemented subtask management directly in team view
 - Added subtask completion progress visualization
@@ -137,6 +149,14 @@
 - Implemented multi-task linking in team inbox messages
 - Created intelligent message parsing to display linked tasks
 - Improved task context preservation when navigating between views
+- **Enhanced Kanban Board with comprehensive task management:**
+  - Added task history button for viewing complete audit trails directly from task cards
+  - Implemented subtask visualization with progress bars and count badges
+  - Added dependency warnings and validation to prevent moving blocked tasks
+  - Improved task card design with better action buttons and visual indicators
+  - Ensured consistent functionality between Kanban and Dashboard views
+  - Added complete task dependency management in task editing dialog
+  - Implemented visual feedback for task updates during drag operations
 
 ## Recent Fixes
 - Fixed foreign key constraint issues with mentions and notifications
@@ -146,10 +166,10 @@
 - Fixed notification visibility with proper RLS policies
 - Created comprehensive migration system for easy deployment
 - Fixed React hook ordering for consistent component rendering
+- Fixed task card display issues with proper null checking for missing data
 
 ## Future Enhancements
 - File attachments for tasks
-- Calendar view for due dates
 - Advanced filtering and sorting options
 - Mobile app version
 - Email notifications for task assignments and updates
