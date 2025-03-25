@@ -176,4 +176,9 @@
 - Task completion analytics and reporting
 
 # start chat like this
-- read the current project and get up to speed on all the feature implemented
+- read the current project and get up to speed on all the feature implemented, and check my supabase database schema for a better understanding of how the project backend works
+
+# run dev
+- npm run dev
+
+

@@ -37,6 +37,22 @@ export interface TimeEntry {
   user_avatar_url?: string;
 }
 
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  storage_path: string;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    name: string | null;
+    email: string | null;
+  };
+}
+
 export interface Task {
   id: string;
   title: string;
