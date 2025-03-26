@@ -565,11 +565,11 @@ export default function KanbanTaskView({
   return (
     <div className="flex flex-col gap-6">
       {/* Team Filter */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <label className="text-sm font-medium">Team:</label>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+          <label className="text-sm font-medium whitespace-nowrap">Team:</label>
           <Select value={teamFilter || "none"} onValueChange={handleTeamFilterChange}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Select team" />
             </SelectTrigger>
             <SelectContent>
@@ -583,7 +583,7 @@ export default function KanbanTaskView({
           </Select>
         </div>
         
-        <Button onClick={() => handleCreateTask("todo")} className="flex items-center gap-2">
+        <Button onClick={() => handleCreateTask("todo")} className="flex items-center gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Add Task
         </Button>
@@ -595,14 +595,18 @@ export default function KanbanTaskView({
           <p className="text-muted-foreground">No tasks found. Create a new task to get started.</p>
         </div>
       ) : (
-        <KanbanBoard 
-          tasks={tasks} 
-          onTaskUpdate={handleTaskUpdate}
-          onTaskClick={handleTaskClick}
-          onAddTask={handleCreateTask}
-          onEdit={handleEditTask}
-          teamId={teamFilter}
-        />
+        <div className="overflow-x-auto pb-4">
+          <div className="min-w-[768px] w-full">
+            <KanbanBoard 
+              tasks={tasks} 
+              onTaskUpdate={handleTaskUpdate}
+              onTaskClick={handleTaskClick}
+              onAddTask={handleCreateTask}
+              onEdit={handleEditTask}
+              teamId={teamFilter}
+            />
+          </div>
+        </div>
       )}
       
       {/* New Task Dialog */}

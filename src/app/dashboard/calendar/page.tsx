@@ -1,6 +1,6 @@
-import DashboardNavbar from "@/components/dashboard-navbar";
+import DashboardLayout from "@/components/dashboard-layout";
 import TaskCalendar from "@/components/task-calendar";
-import { InfoIcon, UserCircle, Users, Calendar } from "lucide-react";
+import { InfoIcon, UserCircle, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../supabase/server";
 import Link from "next/link";
@@ -107,54 +107,49 @@ export default async function CalendarView({
   const userTeams = [
     ...(ownedTeams || []).map(team => ({ id: team.id, name: team.name })),
     ...(memberTeams || []).filter(item => item.teams).map(item => ({ 
-      id: item.teams.id, 
-      name: item.teams.name 
+      id: (item.teams as any).id, 
+      name: (item.teams as any).name 
     }))
   ];
 
   return (
-    <>
-      <DashboardNavbar />
-      <main className="w-full">
-        <div className="container mx-auto px-4 py-8 flex flex-col gap-8">
-          {/* Header Section */}
-          <header className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <h1 className="text-3xl font-bold">Calendar View</h1>
-              <div className="flex gap-2">
-                <Link href="/dashboard">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <UserCircle className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Button>
-                </Link>
-                <Link href="/teams">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Teams</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
-              <InfoIcon size="14" />
-              <span>View your tasks in a calendar format for better scheduling</span>
-            </div>
-          </header>
-
-          {/* Task Calendar Section */}
-          <section className="bg-card rounded-xl p-6 border shadow-sm">
-            <TaskCalendar 
-              initialTasks={processedTasks} 
-              userTeams={userTeams}
-              userId={user.id}
-              initialTeamFilter={teamId}
-              initialTaskId={taskId}
-              initialDate={date ? new Date(date) : undefined}
-            />
-          </section>
+    <DashboardLayout>
+      {/* Header Section */}
+      <header className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Calendar View</h1>
+          <div className="flex gap-2">
+            <Link href="/dashboard">
+              <Button variant="outline" className="flex items-center gap-2">
+                <UserCircle className="h-4 w-4" />
+                <span>Dashboard</span>
+              </Button>
+            </Link>
+            <Link href="/teams">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>Teams</span>
+              </Button>
+            </Link>
+          </div>
         </div>
-      </main>
-    </>
+        <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
+          <InfoIcon size="14" />
+          <span>View your tasks in a calendar format for better scheduling</span>
+        </div>
+      </header>
+
+      {/* Task Calendar Section */}
+      <section className="bg-card rounded-xl p-6 border shadow-sm">
+        <TaskCalendar 
+          initialTasks={processedTasks} 
+          userTeams={userTeams}
+          userId={user.id}
+          initialTeamFilter={teamId}
+          initialTaskId={taskId}
+          initialDate={date ? new Date(date) : undefined}
+        />
+      </section>
+    </DashboardLayout>
   );
 } 

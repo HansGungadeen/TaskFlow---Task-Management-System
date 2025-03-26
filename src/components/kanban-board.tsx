@@ -246,44 +246,50 @@ export default function KanbanBoard({
   
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 h-full">
         {columns.map((column) => (
-          <div key={column.id} className="flex flex-col h-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium">{column.title}</h3>
-              <Badge variant="outline">
-                {tasksByStatus[column.id]?.length || 0}
-              </Badge>
+          <div key={column.id} className="flex flex-col h-full min-w-0">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-medium flex items-center gap-2">
+                {column.title} ({tasksByStatus[column.id]?.length || 0})
+              </h3>
+              {onAddTask && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  onClick={() => onAddTask(column.id)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            
             <Droppable droppableId={column.id}>
               {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={cn(
-                    "flex-1 rounded-lg p-4 min-h-[500px] overflow-y-auto",
-                    snapshot.isDraggingOver 
-                      ? "bg-secondary/80" 
-                      : "bg-secondary/50"
-                  )}
+                  className={`bg-secondary/30 rounded-lg flex-1 p-3 h-full min-h-[300px] overflow-y-auto${
+                    snapshot.isDraggingOver ? " border-2 border-dashed border-primary/50" : ""
+                  }`}
                 >
                   {tasksByStatus[column.id]?.map((task, index) => (
                     <Draggable 
                       key={task.id} 
                       draggableId={task.id} 
                       index={index}
+                      isDragDisabled={isUpdating === task.id}
                     >
                       {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className={cn(
-                            "bg-card rounded-md shadow-sm p-4 mb-3 border border-border cursor-pointer",
-                            snapshot.isDragging ? "shadow-md" : "",
-                            isUpdating === task.id ? "opacity-70" : ""
-                          )}
-                          onClick={() => onTaskClick(task.id)}
+                          className={`bg-card p-4 rounded-lg mb-3 border shadow-sm cursor-pointer ${
+                            snapshot.isDragging ? "opacity-70 shadow-md" : ""
+                          }`}
+                          onClick={() => onTaskClick && onTaskClick(task.id)}
                         >
                           <div className="flex flex-col gap-3">
                             <div className="flex justify-between items-start">
@@ -397,16 +403,10 @@ export default function KanbanBoard({
                   ))}
                   {provided.placeholder}
                   
-                  {onAddTask && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="w-full mt-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => onAddTask(column.id)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add task
-                    </Button>
+                  {(!tasksByStatus[column.id] || tasksByStatus[column.id].length === 0) && (
+                    <div className="text-center p-4 text-muted-foreground text-sm">
+                      No tasks in this column
+                    </div>
                   )}
                 </div>
               )}

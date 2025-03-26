@@ -268,44 +268,48 @@ export default function TaskDependencySelector({
   return (
     <div className="space-y-2">
       {dependencies.length > 0 && (
-        <div className="space-y-2 mb-2">
-          {dependencies.map((task) => (
-            <div 
-              key={task.id} 
-              className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/50 border border-border"
-            >
-              <div className="flex items-center space-x-2 overflow-hidden">
-                <span className="flex-shrink-0 inline-block px-2 py-1 text-xs font-medium rounded-md capitalize"
-                  style={{ 
-                    backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
-                                    task.status === 'in_progress' ? '#fef3c7' : 
-                                    task.status === 'done' ? '#d1fae5' : '#f3f4f6',
-                    color: task.status === 'todo' ? '#374151' : 
-                           task.status === 'in_progress' ? '#92400e' : 
-                           task.status === 'done' ? '#065f46' : '#374151'
-                  }}
-                >
-                  {getStatusText(task.status)}
-                </span>
-                <span className="truncate text-sm font-medium">
-                  {task.title}
-                </span>
-                {task.team_name && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    ({task.team_name})
-                  </span>
-                )}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-full"
-                onClick={() => removeDependency(task.id)}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium mb-2">Current Dependencies</h3>
+          <div className="space-y-2">
+            {dependencies.map((task) => (
+              <div
+                key={task.id}
+                className="flex items-center justify-between p-2 rounded-md border bg-background"
               >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className={`w-2 h-2 rounded-full ${
+                    task.status === "done" 
+                      ? "bg-green-500" 
+                      : task.status === "in_progress" 
+                        ? "bg-blue-500" 
+                        : "bg-gray-500"
+                  }`} />
+                  <span className="truncate">{task.title}</span>
+                  {task.team_name && (
+                    <span className="text-xs text-muted-foreground">
+                      ({task.team_name})
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center">
+                  <Badge
+                    variant="outline"
+                    className={`mr-2 text-xs ${getStatusColor(task.status)}`}
+                  >
+                    {getStatusText(task.status)}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0"
+                    onClick={() => removeDependency(task.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

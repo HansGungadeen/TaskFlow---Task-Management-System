@@ -1,4 +1,4 @@
-import DashboardNavbar from "@/components/dashboard-navbar";
+import DashboardLayout from "@/components/dashboard-layout";
 import KanbanTaskView from "@/components/kanban-task-view";
 import { InfoIcon, UserCircle, Users, Calendar } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -164,53 +164,48 @@ export default async function KanbanPage({
   }
 
   return (
-    <>
-      <DashboardNavbar />
-      <main className="w-full">
-        <div className="container mx-auto px-4 py-8 flex flex-col gap-8">
-          {/* Header Section */}
-          <header className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <h1 className="text-3xl font-bold">Kanban Board</h1>
-              <div className="flex gap-2">
-                <Link href="/dashboard">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <UserCircle className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Button>
-                </Link>
-                <Link href="/dashboard/calendar">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Calendar</span>
-                  </Button>
-                </Link>
-                <Link href="/teams">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Teams</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
-              <InfoIcon size="14" />
-              <span>Manage your tasks using this drag-and-drop Kanban board</span>
-            </div>
-          </header>
-
-          {/* Kanban Board Section */}
-          <section className="bg-card rounded-xl p-6 border shadow-sm">
-            <KanbanTaskView 
-              initialTasks={processedTasks} 
-              userTeams={userTeams}
-              userId={user.id}
-              initialTeamFilter={teamId}
-              initialTaskId={taskId}
-            />
-          </section>
+    <DashboardLayout>
+      {/* Header Section */}
+      <header className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Kanban Board</h1>
+          <div className="flex gap-2">
+            <Link href="/dashboard">
+              <Button variant="outline" className="flex items-center gap-2">
+                <UserCircle className="h-4 w-4" />
+                <span>Dashboard</span>
+              </Button>
+            </Link>
+            <Link href="/dashboard/calendar">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span>Calendar</span>
+              </Button>
+            </Link>
+            <Link href="/teams">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>Teams</span>
+              </Button>
+            </Link>
+          </div>
         </div>
-      </main>
-    </>
+        <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
+          <InfoIcon size="14" />
+          <span>Manage your tasks using this drag-and-drop Kanban board</span>
+        </div>
+      </header>
+
+      {/* Kanban Board Section */}
+      <section className="bg-card rounded-xl p-6 border shadow-sm">
+        <KanbanTaskView 
+          initialTasks={processedTasks} 
+          userTeams={userTeams}
+          userId={user.id}
+          initialTeamFilter={teamId}
+          initialTaskId={taskId}
+        />
+      </section>
+    </DashboardLayout>
   );
 } 

@@ -194,7 +194,10 @@ export default function TaskViewCard({
     const fetchAttachments = async () => {
       if (!task) return;
 
+      console.log('DEBUG - Starting fetchAttachments for task:', task.id);
+
       try {
+        console.log('DEBUG - Querying task_attachments table');
         const { data, error } = await supabase
           .from('task_attachments')
           .select(`
@@ -204,14 +207,18 @@ export default function TaskViewCard({
           .eq('task_id', task.id)
           .order('created_at', { ascending: false });
 
+        console.log('DEBUG - Attachment query results:', { data, error });
+        
         if (error) throw error;
         setAttachments(data || []);
+        console.log('DEBUG - Attachments set to state:', data || []);
       } catch (error) {
         console.error('Error fetching attachments:', error);
       }
     };
 
     if (task && isOpen) {
+      console.log('DEBUG - Task is open, fetching attachments');
       fetchAttachments();
     }
   }, [task, isOpen, supabase]);
@@ -853,15 +860,17 @@ export default function TaskViewCard({
                     <CardHeader className="pb-3">
                       <CardTitle className="text-md">Task Dependencies</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-hidden">
                       {task && userData?.user && (
-                        <TaskDependencySelector
-                          taskId={task.id}
-                          userId={userData?.user?.id || ""}
-                          onDependenciesChange={() => {
-                            if (onSubtasksChange) onSubtasksChange();
-                          }}
-                        />
+                        <div className="max-h-[200px] overflow-y-auto">
+                          <TaskDependencySelector
+                            taskId={task.id}
+                            userId={userData?.user?.id || ""}
+                            onDependenciesChange={() => {
+                              if (onSubtasksChange) onSubtasksChange();
+                            }}
+                          />
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -871,54 +880,62 @@ export default function TaskViewCard({
                     <CardHeader className="pb-3">
                       <CardTitle className="text-md">Attachments</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="overflow-hidden">
                       {task && (
-                        <TaskAttachments
-                          taskId={task.id}
-                          attachments={attachments}
-                          onAttachmentAdded={() => {
-                            const fetchAttachments = async () => {
-                              const { data, error } = await supabase
-                                .from('task_attachments')
-                                .select(`
-                                  *,
-                                  user:users(name, email)
-                                `)
-                                .eq('task_id', task.id)
-                                .order('created_at', { ascending: false });
+                        <div className="max-h-[200px] overflow-y-auto">
+                          <TaskAttachments
+                            taskId={task.id}
+                            attachments={attachments}
+                            onAttachmentAdded={() => {
+                              console.log('DEBUG - onAttachmentAdded callback triggered');
+                              const fetchAttachments = async () => {
+                                console.log('DEBUG - Re-fetching attachments after addition');
+                                const { data, error } = await supabase
+                                  .from('task_attachments')
+                                  .select(`
+                                    *,
+                                    user:users(name, email)
+                                  `)
+                                  .eq('task_id', task.id)
+                                  .order('created_at', { ascending: false });
 
-                              if (error) {
-                                console.error('Error fetching attachments:', error);
-                                return;
-                              }
+                                if (error) {
+                                  console.error('Error fetching attachments:', error);
+                                  return;
+                                }
 
-                              setAttachments(data || []);
-                            };
+                                console.log('DEBUG - New attachments after addition:', data);
+                                setAttachments(data || []);
+                              };
 
-                            fetchAttachments();
-                          }}
-                          onAttachmentDeleted={() => {
-                            const fetchAttachments = async () => {
-                              const { data, error } = await supabase
-                                .from('task_attachments')
-                                .select(`
-                                  *,
-                                  user:users(name, email)
-                                `)
-                                .eq('task_id', task.id)
-                                .order('created_at', { ascending: false });
+                              fetchAttachments();
+                            }}
+                            onAttachmentDeleted={() => {
+                              console.log('DEBUG - onAttachmentDeleted callback triggered');
+                              const fetchAttachments = async () => {
+                                console.log('DEBUG - Re-fetching attachments after deletion');
+                                const { data, error } = await supabase
+                                  .from('task_attachments')
+                                  .select(`
+                                    *,
+                                    user:users(name, email)
+                                  `)
+                                  .eq('task_id', task.id)
+                                  .order('created_at', { ascending: false });
 
-                              if (error) {
-                                console.error('Error fetching attachments:', error);
-                                return;
-                              }
+                                if (error) {
+                                  console.error('Error fetching attachments:', error);
+                                  return;
+                                }
 
-                              setAttachments(data || []);
-                            };
+                                console.log('DEBUG - New attachments after deletion:', data);
+                                setAttachments(data || []);
+                              };
 
-                            fetchAttachments();
-                          }}
-                        />
+                              fetchAttachments();
+                            }}
+                          />
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -977,54 +994,56 @@ export default function TaskViewCard({
                       <CardHeader className="pb-3">
                         <CardTitle className="text-md">Attachments</CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="overflow-hidden">
                         {task && (
-                          <TaskAttachments
-                            taskId={task.id}
-                            attachments={attachments}
-                            onAttachmentAdded={() => {
-                              const fetchAttachments = async () => {
-                                const { data, error } = await supabase
-                                  .from('task_attachments')
-                                  .select(`
-                                    *,
-                                    user:users(name, email)
-                                  `)
-                                  .eq('task_id', task.id)
-                                  .order('created_at', { ascending: false });
+                          <div className="max-h-[300px] overflow-y-auto">
+                            <TaskAttachments
+                              taskId={task.id}
+                              attachments={attachments}
+                              onAttachmentAdded={() => {
+                                const fetchAttachments = async () => {
+                                  const { data, error } = await supabase
+                                    .from('task_attachments')
+                                    .select(`
+                                      *,
+                                      user:users(name, email)
+                                    `)
+                                    .eq('task_id', task.id)
+                                    .order('created_at', { ascending: false });
 
-                                if (error) {
-                                  console.error('Error fetching attachments:', error);
-                                  return;
-                                }
+                                  if (error) {
+                                    console.error('Error fetching attachments:', error);
+                                    return;
+                                  }
 
-                                setAttachments(data || []);
-                              };
+                                  setAttachments(data || []);
+                                };
 
-                              fetchAttachments();
-                            }}
-                            onAttachmentDeleted={() => {
-                              const fetchAttachments = async () => {
-                                const { data, error } = await supabase
-                                  .from('task_attachments')
-                                  .select(`
-                                    *,
-                                    user:users(name, email)
-                                  `)
-                                  .eq('task_id', task.id)
-                                  .order('created_at', { ascending: false });
+                                fetchAttachments();
+                              }}
+                              onAttachmentDeleted={() => {
+                                const fetchAttachments = async () => {
+                                  const { data, error } = await supabase
+                                    .from('task_attachments')
+                                    .select(`
+                                      *,
+                                      user:users(name, email)
+                                    `)
+                                    .eq('task_id', task.id)
+                                    .order('created_at', { ascending: false });
 
-                                if (error) {
-                                  console.error('Error fetching attachments:', error);
-                                  return;
-                                }
+                                  if (error) {
+                                    console.error('Error fetching attachments:', error);
+                                    return;
+                                  }
 
-                                setAttachments(data || []);
-                              };
+                                  setAttachments(data || []);
+                                };
 
-                              fetchAttachments();
-                            }}
-                          />
+                                fetchAttachments();
+                              }}
+                            />
+                          </div>
                         )}
                       </CardContent>
                     </Card>
