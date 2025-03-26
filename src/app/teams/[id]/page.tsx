@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import DashboardNavbar from "@/components/dashboard-navbar";
+import DashboardLayout from "@/components/dashboard-layout";
 import { createClient } from "../../../../supabase/server";
 import TeamDetail from "@/components/team-detail";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import Link from "next/link";
 
 export default async function TeamDetailPage({ params }: { params: { id: string } }) {
@@ -53,35 +53,36 @@ export default async function TeamDetailPage({ params }: { params: { id: string 
     .order("created_at", { ascending: false });
 
   return (
-    <>
-      <DashboardNavbar />
-      <main className="w-full">
-        <div className="container mx-auto px-4 py-8 flex flex-col gap-8">
-          {/* Header Section */}
-          <header className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <Link href="/teams" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <h1 className="text-3xl font-bold">{team.name}</h1>
-            </div>
-            {team.description && (
-              <p className="text-muted-foreground">{team.description}</p>
-            )}
-          </header>
-
-          {/* Team Detail Section */}
-          <section className="bg-card rounded-xl p-6 border shadow-sm">
-            <TeamDetail 
-              team={team}
-              currentUser={user}
-              teamMembers={teamMembers || []}
-              teamTasks={teamTasks || []}
-              userRole={teamMember.role}
-            />
-          </section>
+    <DashboardLayout>
+      {/* Header Section */}
+      <header className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Link href="/teams" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <h1 className="text-3xl font-bold">{team.name}</h1>
+          <div className="ml-auto">
+            <span className="bg-secondary px-3 py-1 rounded-full text-sm flex items-center gap-2">
+              <Users className="h-3.5 w-3.5" />
+              <span>{teamMembers?.length || 0} members</span>
+            </span>
+          </div>
         </div>
-      </main>
-    </>
+        {team.description && (
+          <p className="text-muted-foreground">{team.description}</p>
+        )}
+      </header>
+
+      {/* Team Detail Section */}
+      <section className="bg-card rounded-xl p-6 border shadow-sm">
+        <TeamDetail 
+          team={team}
+          currentUser={user}
+          teamMembers={teamMembers || []}
+          teamTasks={teamTasks || []}
+          userRole={teamMember.role}
+        />
+      </section>
+    </DashboardLayout>
   );
 } 

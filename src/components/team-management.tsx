@@ -426,33 +426,28 @@ export default function TeamManagement({
     const role = 'memberRole' in team ? team.memberRole : 'admin';
     
     return (
-      <Card key={team.id} className="hover:shadow-md transition-shadow">
-        <CardHeader>
+      <Card key={team.id} className="flex flex-col h-full hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
-            <CardTitle className="text-xl">{team.name}</CardTitle>
-            <div className="flex items-center gap-1">
-              <Button 
-                size="sm" 
-                variant="ghost"
-                className="h-8 w-8 p-0"
-                onClick={() => handleViewTeam(team.id)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <CardTitle className="text-xl truncate">{team.name}</CardTitle>
+            <div className="rounded-full p-1 bg-secondary">
+              <RoleBadge role={role as TeamRole} />
             </div>
           </div>
           {team.description && (
-            <CardDescription>{team.description}</CardDescription>
+            <CardDescription className="line-clamp-2 mt-1">{team.description}</CardDescription>
           )}
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+        
+        <CardContent className="pb-2 flex-grow">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
-            <span>Role: <span className="capitalize">{role}</span></span>
+            <span>{new Date(team.created_at).toLocaleDateString()}</span>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <div className="flex items-center gap-2">
+        
+        <CardFooter className="pt-3 border-t flex flex-wrap gap-2 justify-between items-center">
+          <div className="flex flex-wrap gap-2">
             <Button 
               size="sm"
               variant="outline"
@@ -495,13 +490,13 @@ export default function TeamManagement({
                   setCurrentTeam(team as Team);
                   setIsEditing(true);
                 }}
-                className="h-8"
+                className="h-8 p-2"
               >
                 <Edit className="h-4 w-4" />
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 text-destructive">
+                  <Button variant="ghost" size="sm" className="h-8 p-2 text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
@@ -534,7 +529,7 @@ export default function TeamManagement({
   return (
     <div className="space-y-8">
       <Tabs defaultValue="my-teams" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex">
           <TabsTrigger value="my-teams" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span>My Teams</span>
@@ -553,7 +548,8 @@ export default function TeamManagement({
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <PlusCircle className="h-4 w-4" />
-                  <span>Create Team</span>
+                  <span className="hidden sm:inline">Create Team</span>
+                  <span className="sm:hidden">New</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -613,7 +609,7 @@ export default function TeamManagement({
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {teams.map((team) => renderTeamCard(team))}
             </div>
           )}
@@ -631,7 +627,7 @@ export default function TeamManagement({
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {teamsAsMember.map((team) => renderTeamCard(team, false))}
             </div>
           )}

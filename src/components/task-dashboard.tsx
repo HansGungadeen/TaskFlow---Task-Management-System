@@ -542,11 +542,11 @@ export default function TaskDashboard({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "todo":
-        return <ListTodo className="h-4 w-4 text-gray-500" />;
+        return <ListTodo className="h-4 w-4 text-muted-foreground" />;
       case "in_progress":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />;
       case "done":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />;
       default:
         return null;
     }
@@ -838,8 +838,8 @@ export default function TaskDashboard({
 
   return (
     <div className="space-y-6 bg-background text-foreground">
-      <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mb-6">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={viewMode === "grid" ? "default" : "outline"}
             size="sm"
@@ -864,46 +864,6 @@ export default function TaskDashboard({
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row justify-between gap-2 mb-6">
-          <div className="flex flex-wrap gap-2">
-            <DueDateFilter
-              value={dueDateFilter}
-              onChange={(value) => setDueDateFilter(value)}
-            />
-            
-            {userTeams && userTeams.length > 0 && (
-              <Select
-                value={teamFilter || "all"}
-                onValueChange={(value) => setTeamFilter(value === "all" ? null : value)}
-              >
-                <SelectTrigger className="h-9 w-[180px]">
-                  <SelectValue placeholder="Filter by team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tasks</SelectItem>
-                  <SelectItem value="personal">Personal Tasks</SelectItem>
-                  {userTeams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            
-            <Button
-              variant="outline"
-              className="h-9"
-              onClick={() => {
-                setDueDateFilter(null);
-                setTeamFilter(null);
-              }}
-            >
-              Clear Filters
-            </Button>
-          </div>
-        </div>
-
         <Dialog open={isCreating} onOpenChange={setIsCreating}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-1">
@@ -926,6 +886,115 @@ export default function TaskDashboard({
             {renderTaskForm()}
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Filter Section - Reorganized */}
+      <div className="flex flex-col space-y-2 mb-6 p-4 bg-muted/10 rounded-lg border">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="w-full md:w-auto flex items-center gap-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Filters:</h3>
+          </div>
+          
+          <div className="flex flex-wrap gap-3 w-full">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Due:</span>
+              <Button 
+                variant={dueDateFilter === "today" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setDueDateFilter(dueDateFilter === "today" ? null : "today")}
+                className="h-9"
+              >
+                Today
+              </Button>
+              <Button 
+                variant={dueDateFilter === "tomorrow" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setDueDateFilter(dueDateFilter === "tomorrow" ? null : "tomorrow")}
+                className="h-9"
+              >
+                Tomorrow
+              </Button>
+              <Button 
+                variant={dueDateFilter === "week" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setDueDateFilter(dueDateFilter === "week" ? null : "week")}
+                className="h-9"
+              >
+                This Week
+              </Button>
+              <Button 
+                variant={dueDateFilter === "overdue" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setDueDateFilter(dueDateFilter === "overdue" ? null : "overdue")}
+                className="h-9"
+              >
+                Overdue
+              </Button>
+              <Button 
+                variant={dueDateFilter === "custom" ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setDueDateFilter(dueDateFilter === "custom" ? null : "custom")}
+                className="h-9"
+              >
+                Custom
+              </Button>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
+              {userTeams && userTeams.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Team:</span>
+                  <Select
+                    value={teamFilter || "all"}
+                    onValueChange={(value) => setTeamFilter(value === "all" ? null : value)}
+                  >
+                    <SelectTrigger className="h-9 w-[180px]">
+                      <SelectValue placeholder="All Teams" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Teams</SelectItem>
+                      <SelectItem value="personal">Personal Tasks</SelectItem>
+                      {userTeams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Assignee:</span>
+                <Select
+                  value={assigneeFilter || "all"}
+                  onValueChange={(value) => setAssigneeFilter(value === "all" ? null : value)}
+                >
+                  <SelectTrigger className="h-9 w-[180px]">
+                    <SelectValue placeholder="All Assignees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Assignees</SelectItem>
+                    <SelectItem value="mine">Assigned to Me</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button
+                variant="outline"
+                className="h-9"
+                onClick={() => {
+                  setDueDateFilter(null);
+                  setTeamFilter(null);
+                  setAssigneeFilter(null);
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {viewMode === "grid" ? (
@@ -1018,7 +1087,7 @@ export default function TaskDashboard({
       ) : (
         <div className="space-y-6">
           <div className="rounded-md border">
-            <div className="bg-gray-50 p-4 font-medium">
+            <div className="bg-muted/50 dark:bg-muted/20 p-4 font-medium">
               <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-5">Title</div>
                 <div className="col-span-4">Description</div>
@@ -1026,9 +1095,9 @@ export default function TaskDashboard({
                 <div className="col-span-1">Actions</div>
               </div>
             </div>
-            <div className="divide-y">
+            <div className="divide-y divide-border">
               {filteredTasks.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-muted-foreground text-center py-8">
                   No tasks yet. Create your first task!
                 </p>
               ) : (
@@ -1057,7 +1126,7 @@ export default function TaskDashboard({
                           )}
                         </div>
                       </div>
-                      <div className="col-span-4 text-sm text-gray-500 truncate">
+                      <div className="col-span-4 text-sm text-muted-foreground truncate">
                         {task.description || "No description"}
                       </div>
                       <div className="col-span-2">
