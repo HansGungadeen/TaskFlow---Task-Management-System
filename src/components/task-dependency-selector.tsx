@@ -36,12 +36,14 @@ type TaskDependencySelectorProps = {
   taskId: string;
   userId: string;
   onDependenciesChange?: () => void;
+  scrollCurrentDependencies?: boolean;
 };
 
 export default function TaskDependencySelector({
   taskId,
   userId,
   onDependenciesChange,
+  scrollCurrentDependencies,
 }: TaskDependencySelectorProps) {
   const [open, setOpen] = useState(false);
   const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
@@ -267,148 +269,169 @@ export default function TaskDependencySelector({
 
   return (
     <div className="space-y-4">
-      {dependencies.length === 0 ? (
-        <div className="text-sm text-muted-foreground mb-2">No dependencies set</div>
-      ) : (
-        <div>
-          <h3 className="text-sm font-medium mb-2">Current Dependencies</h3>
-          <div className="space-y-2">
-            {dependencies.map((task) => (
-              <div
-                key={task.id}
-                className="flex flex-wrap items-center justify-between p-2 rounded-md border bg-background"
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
-                  <span className={`w-2 h-2 flex-shrink-0 rounded-full ${
-                    task.status === "done" 
-                      ? "bg-green-500" 
-                      : task.status === "in_progress" 
-                        ? "bg-blue-500" 
-                        : "bg-gray-500"
-                  }`} />
-                  <span className="truncate font-medium text-sm">{task.title}</span>
-                </div>
-                {task.team_name && (
-                  <span className="text-xs text-muted-foreground ml-4 mr-auto">
-                    {task.team_name}
-                  </span>
-                )}
-                <div className="flex items-center mt-1 md:mt-0 ml-auto">
-                  <Badge
-                    variant="outline"
-                    className={`mr-2 text-xs whitespace-nowrap ${getStatusColor(task.status)}`}
-                  >
-                    {getStatusText(task.status)}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 flex-shrink-0"
-                    onClick={() => removeDependency(task.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Current Dependencies Section */}
+      <div className="border rounded-md p-3 bg-card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium">Current Dependencies</h3>
+          <div className="h-px flex-1 bg-border mx-3"></div>
+          <Badge variant="outline" className="text-xs">
+            {dependencies.length} {dependencies.length === 1 ? 'task' : 'tasks'}
+          </Badge>
         </div>
-      )}
-
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-sm w-full justify-between"
-            role="combobox"
-            aria-expanded={open}
-          >
-            <span>Select task dependencies...</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="p-2 w-[calc(100vw-2rem)] max-w-[350px]" align="start">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Command className="rounded-lg border flex-1">
-                <CommandInput 
-                  placeholder="Search tasks..." 
-                  value={searchValue} 
-                  onValueChange={setSearchValue}
-                  className="h-9"
-                />
-              </Command>
-            </div>
-            
-            {filteredAvailableTasks.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                No matching tasks found
-              </div>
-            ) : (
-              <ScrollArea className="h-72">
-                <div className="space-y-2 px-1 py-2">
-                  {filteredAvailableTasks.map((task) => (
-                    <Card 
-                      key={task.id}
-                      className="p-3 hover:bg-accent cursor-pointer transition-colors"
-                      onClick={() => {
-                        addDependency(task.id);
-                        setOpen(false);
-                        setSearchValue("");
-                      }}
+        
+        <div className={scrollCurrentDependencies ? "overflow-y-auto mb-1" : ""} style={scrollCurrentDependencies ? { maxHeight: "150px" } : undefined}>
+          {dependencies.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2 text-center">No dependencies set</div>
+          ) : (
+            <div className="space-y-2">
+              {dependencies.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex flex-wrap items-center justify-between p-2 rounded-md border bg-background"
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                    <span className={`w-2 h-2 flex-shrink-0 rounded-full ${
+                      task.status === "done" 
+                        ? "bg-green-500" 
+                        : task.status === "in_progress" 
+                          ? "bg-blue-500" 
+                          : "bg-gray-500"
+                    }`} />
+                    <span className="truncate font-medium text-sm">{task.title}</span>
+                  </div>
+                  {task.team_name && (
+                    <span className="text-xs text-muted-foreground ml-4 mr-auto">
+                      {task.team_name}
+                    </span>
+                  )}
+                  <div className="flex items-center mt-1 md:mt-0 ml-auto">
+                    <Badge
+                      variant="outline"
+                      className={`mr-2 text-xs whitespace-nowrap ${getStatusColor(task.status)}`}
                     >
-                      <div className="flex items-start gap-2">
-                        <Checkbox
-                          id={`task-${task.id}`}
-                          className="mt-1 flex-shrink-0"
-                          checked={false}
-                          onCheckedChange={() => {
-                            addDependency(task.id);
-                            setOpen(false);
-                            setSearchValue("");
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        />
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <label 
-                            htmlFor={`task-${task.id}`}
-                            className="text-sm font-medium block cursor-pointer truncate"
-                          >
-                            {task.title}
-                          </label>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span
-                              className="text-xs px-1.5 py-0.5 rounded-md whitespace-nowrap"
-                              style={{ 
-                                backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
-                                                task.status === 'in_progress' ? '#fef3c7' : 
-                                                task.status === 'done' ? '#d1fae5' : '#f3f4f6',
-                                color: task.status === 'todo' ? '#374151' : 
-                                      task.status === 'in_progress' ? '#92400e' : 
-                                      task.status === 'done' ? '#065f46' : '#374151'
-                              }}
+                      {getStatusText(task.status)}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 flex-shrink-0"
+                      onClick={() => removeDependency(task.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Dependencies Section */}
+      <div className="border rounded-md p-3 bg-card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium">Add Dependencies</h3>
+          <div className="h-px flex-1 bg-border mx-3"></div>
+          <Button variant="ghost" size="sm" disabled className="pointer-events-none">
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="text-xs">Link Tasks</span>
+          </Button>
+        </div>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-sm w-full justify-between"
+              role="combobox"
+              aria-expanded={open}
+            >
+              <span>Select task dependencies...</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-2 w-[calc(100vw-2rem)] max-w-[350px]" align="start">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Command className="rounded-lg border flex-1">
+                  <CommandInput 
+                    placeholder="Search tasks..." 
+                    value={searchValue} 
+                    onValueChange={setSearchValue}
+                    className="h-9"
+                  />
+                </Command>
+              </div>
+              
+              {filteredAvailableTasks.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  No matching tasks found
+                </div>
+              ) : (
+                <ScrollArea className="h-72">
+                  <div className="space-y-2 px-1 py-2">
+                    {filteredAvailableTasks.map((task) => (
+                      <Card 
+                        key={task.id}
+                        className="p-3 hover:bg-accent cursor-pointer transition-colors"
+                        onClick={() => {
+                          addDependency(task.id);
+                          setOpen(false);
+                          setSearchValue("");
+                        }}
+                      >
+                        <div className="flex items-start gap-2">
+                          <Checkbox
+                            id={`task-${task.id}`}
+                            className="mt-1 flex-shrink-0"
+                            checked={false}
+                            onCheckedChange={() => {
+                              addDependency(task.id);
+                              setOpen(false);
+                              setSearchValue("");
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                          />
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <label 
+                              htmlFor={`task-${task.id}`}
+                              className="text-sm font-medium block cursor-pointer truncate"
                             >
-                              {getStatusText(task.status)}
-                            </span>
-                            {task.team_name && (
-                              <span className="text-xs text-muted-foreground truncate">
-                                {task.team_name}
+                              {task.title}
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                                style={{ 
+                                  backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
+                                                  task.status === 'in_progress' ? '#fef3c7' : 
+                                                  task.status === 'done' ? '#d1fae5' : '#f3f4f6',
+                                  color: task.status === 'todo' ? '#374151' : 
+                                        task.status === 'in_progress' ? '#92400e' : 
+                                        task.status === 'done' ? '#065f46' : '#374151'
+                                }}
+                              >
+                                {getStatusText(task.status)}
                               </span>
-                            )}
+                              {task.team_name && (
+                                <span className="text-xs text-muted-foreground truncate">
+                                  {task.team_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }

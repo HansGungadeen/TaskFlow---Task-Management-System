@@ -95,6 +95,8 @@ export default function TaskDashboard({
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [viewTaskOpen, setViewTaskOpen] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -362,10 +364,11 @@ export default function TaskDashboard({
   // Open task if initialTaskId is provided
   useEffect(() => {
     if (initialTaskId && tasks.length > 0) {
+      console.log(`Opening task with ID: ${initialTaskId}`);
       const taskToOpen = tasks.find(task => task.id === initialTaskId);
       if (taskToOpen) {
         setCurrentTask(taskToOpen);
-        setIsEditing(true);
+        setViewTaskOpen(true);
       }
     }
   }, [initialTaskId, tasks]);
@@ -1178,6 +1181,28 @@ export default function TaskDashboard({
           </div>
         </div>
       )}
+
+      {/* Main Task View Card for viewing tasks from notifications */}
+      <TaskViewCard
+        task={currentTask}
+        isOpen={viewTaskOpen}
+        onClose={() => {
+          setViewTaskOpen(false);
+          setCurrentTask(null);
+        }}
+        onSubtasksChange={() => {
+          // Refresh the tasks data without causing an error
+          if (userId) {
+            supabase
+              .from("tasks")
+              .select("*")
+              .eq("user_id", userId)
+              .then(({ data }) => {
+                if (data) setTasks(data);
+              });
+          }
+        }}
+      />
     </div>
   );
 }

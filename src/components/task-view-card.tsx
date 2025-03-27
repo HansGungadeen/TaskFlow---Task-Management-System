@@ -577,7 +577,7 @@ export default function TaskViewCard({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] 2xl:max-w-[70%] h-[85vh]">
           <DialogHeader>
             <DialogTitle className="text-xl">
               {editingTitle ? (
@@ -625,436 +625,439 @@ export default function TaskViewCard({
             </DialogTitle>
           </DialogHeader>
 
-          <Tabs defaultValue="details">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="comments">Comments</TabsTrigger>
-            </TabsList>
+          <div className="flex-1 h-[calc(85vh-80px)] overflow-hidden">
+            <Tabs defaultValue="details" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="comments">Comments</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="details" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                {/* Main content column */}
-                <div className="md:col-span-2 space-y-4 md:space-y-6">
-                  {/* Description section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Description</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {editingDescription ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            className="min-h-[100px]"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingDescription(false);
-                                setDescription(task?.description || "");
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={handleUpdateDescription}
-                            >
-                              Save
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div
-                          className="min-h-[60px] cursor-pointer group"
-                          onClick={handleEditDescription}
-                        >
-                          {task?.description ? (
-                            <p className="whitespace-pre-wrap">{task.description}</p>
-                          ) : (
-                            <p className="text-muted-foreground italic">
-                              No description provided.{" "}
-                              <span className="text-primary group-hover:underline">
-                                Add one
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Subtasks section */}
-                  <div className="space-y-2 md:space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-md font-medium">Subtasks</h3>
-                    </div>
-
-                    <div className="space-y-2 md:space-y-3">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add a subtask..."
-                          value={newSubtask}
-                          onChange={(e) => setNewSubtask(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newSubtask.trim()) {
-                              handleAddSubtask();
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        <Button onClick={handleAddSubtask} disabled={!newSubtask.trim()}>
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {isLoading ? (
-                        <div className="text-center py-4 text-sm text-muted-foreground">
-                          Loading subtasks...
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {subtasks.map((subtask) => (
-                            <div
-                              key={subtask.id}
-                              className="flex items-center justify-between p-2 md:p-3 bg-secondary/30 rounded-md"
-                            >
-                              <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
-                                <Checkbox
-                                  id={`view-subtask-${subtask.id}`}
-                                  checked={subtask.completed}
-                                  onCheckedChange={(checked) =>
-                                    handleToggleSubtask(subtask.id, checked === true)
-                                  }
-                                />
-                                <Label
-                                  htmlFor={`view-subtask-${subtask.id}`}
-                                  className={`text-sm md:text-base truncate ${subtask.completed ? "line-through text-gray-500" : ""}`}
-                                >
-                                  {subtask.title}
-                                </Label>
-                              </div>
+              <TabsContent value="details" className="flex-1 mt-4 overflow-auto data-[state=active]:flex data-[state=active]:flex-col">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0 flex-1">
+                  {/* Main content column */}
+                  <div className="md:col-span-2 flex flex-col gap-4 min-h-0">
+                    {/* Description section - Make it align with the first three cards in the sidebar */}
+                    <Card className="flex flex-col" style={{ height: "min(310px, 30vh)" }}>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Description</CardTitle>
+                      </CardHeader>
+                      <CardContent className="overflow-auto flex-1 pr-2">
+                        {editingDescription ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                              className="min-h-[100px]"
+                            />
+                            <div className="flex justify-end gap-2">
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteSubtask(subtask.id)}
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingDescription(false);
+                                  setDescription(task?.description || "");
+                                }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={handleUpdateDescription}
+                              >
+                                Save
                               </Button>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="min-h-[60px] cursor-pointer group"
+                            onClick={handleEditDescription}
+                          >
+                            {task?.description ? (
+                              <p className="whitespace-pre-wrap">{task.description}</p>
+                            ) : (
+                              <p className="text-muted-foreground italic">
+                                No description provided.{" "}
+                                <span className="text-primary group-hover:underline">
+                                  Add one
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                  {/* Comments section in details tab */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Comments</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {task && (
-                        <TaskComments
-                          taskId={task.id}
-                          teamId={task.team_id || null}
-                          currentUser={userData?.user}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Sidebar column */}
-                <div className="space-y-4">
-                  {/* Status section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Select
-                        defaultValue={task?.status}
-                        onValueChange={handleStatusChange}
-                        disabled={task?.has_dependencies && !task?.dependencies_completed}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              <>
-                                <div className="flex items-center space-x-2">
-                                  {getStatusIcon(task?.status || "todo")}
-                                  <span className="capitalize">
-                                    {task?.status?.replace("_", " ") || "Todo"}
-                                  </span>
-                                </div>
-                              </>
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todo">
-                            <div className="flex items-center space-x-2">
-                              <ListTodo className="h-4 w-4" />
-                              <span>Todo</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="in_progress">
-                            <div className="flex items-center space-x-2">
-                              <Clock className="h-4 w-4 text-blue-500" />
-                              <span>In Progress</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="done">
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              <span>Done</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-
-                      {task?.has_dependencies && !task?.dependencies_completed && (
-                        <div className="flex items-center space-x-2 mt-2 text-yellow-500 text-sm">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>
-                            Complete dependencies before changing status
-                          </span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Time tracking summary */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Time Spent</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-5 w-5 text-blue-500" />
-                          <span className="font-medium">{totalHours.toFixed(1)} hours</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsTimeTrackingOpen(true)}
-                        >
-                          Manage
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Priority section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Priority</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Select
-                        value={task?.priority || "medium"}
-                        onValueChange={handlePriorityChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              <>
-                                <div className="flex items-center space-x-2">
-                                  {getPriorityColor(task?.priority || null)}
-                                  <span className="capitalize">
-                                    {task?.priority?.replace("_", " ") || "Medium"}
-                                  </span>
-                                </div>
-                              </>
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                              <span>Low</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="medium">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full" />
-                              <span>Medium</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="high">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                              <span>High</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="urgent">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-2 h-2 bg-red-500 rounded-full" />
-                              <span>Urgent</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </CardContent>
-                  </Card>
-
-                  {/* Due date section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Due Date</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {editingDueDate ? (
-                        <div className="flex flex-col space-y-2">
-                          <Input
-                            id="due-date"
-                            type="datetime-local"
-                            value={dueDate}
-                            onChange={(e) => setDueDate(e.target.value)}
-                            className="w-full"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => {
-                                setEditingDueDate(false);
-                                setDueDate(task?.due_date || "");
-                              }}>
-                              Cancel
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={handleUpdateDueDate}>
-                              Save
+                    {/* Subtasks section */}
+                    <Card className="flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Subtasks</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Add a subtask..."
+                              value={newSubtask}
+                              onChange={(e) => setNewSubtask(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newSubtask.trim()) {
+                                  handleAddSubtask();
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            <Button onClick={handleAddSubtask} disabled={!newSubtask.trim()}>
+                              <Plus className="h-4 w-4" />
                             </Button>
                           </div>
+                          {isLoading ? (
+                            <div className="text-center py-4 text-sm text-muted-foreground">
+                              Loading subtasks...
+                            </div>
+                          ) : (
+                            <>
+                              <div className="space-y-2 overflow-y-auto pr-2" style={{ maxHeight: subtasks.length > 5 ? "200px" : "auto" }}>
+                                {subtasks.map((subtask) => (
+                                  <div
+                                    key={subtask.id}
+                                    className="flex items-center justify-between p-2 bg-secondary/30 rounded-md"
+                                  >
+                                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                      <Checkbox
+                                        id={`view-subtask-${subtask.id}`}
+                                        checked={subtask.completed}
+                                        onCheckedChange={(checked) =>
+                                          handleToggleSubtask(subtask.id, checked === true)
+                                        }
+                                      />
+                                      <Label
+                                        htmlFor={`view-subtask-${subtask.id}`}
+                                        className={`text-sm truncate ${subtask.completed ? "line-through text-gray-500" : ""}`}
+                                      >
+                                        {subtask.title}
+                                      </Label>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteSubtask(subtask.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                              {subtasks.length > 5 && (
+                                <div className="text-xs text-muted-foreground text-center mt-2">
+                                  Showing all {subtasks.length} subtasks
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="truncate text-sm">
-                            {task?.due_date
-                              ? new Date(task.due_date).toLocaleString()
-                              : "No due date set"}
+                      </CardContent>
+                    </Card>
+
+                    {/* Comments section in details tab */}
+                    <Card className="flex-1 min-h-0 flex flex-col">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Comments</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex-1 overflow-auto">
+                        {task && (
+                          <TaskComments
+                            taskId={task.id}
+                            teamId={task.team_id || null}
+                            currentUser={userData?.user}
+                          />
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Sidebar column */}
+                  <div className="flex flex-col gap-4 h-fit">
+                    {/* Status section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Status</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Select
+                          defaultValue={task?.status}
+                          onValueChange={handleStatusChange}
+                          disabled={task?.has_dependencies && !task?.dependencies_completed}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                <>
+                                  <div className="flex items-center space-x-2">
+                                    {getStatusIcon(task?.status || "todo")}
+                                    <span className="capitalize">
+                                      {task?.status?.replace("_", " ") || "Todo"}
+                                    </span>
+                                  </div>
+                                </>
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todo">
+                              <div className="flex items-center space-x-2">
+                                <ListTodo className="h-4 w-4" />
+                                <span>Todo</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="in_progress">
+                              <div className="flex items-center space-x-2">
+                                <Clock className="h-4 w-4 text-blue-500" />
+                                <span>In Progress</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="done">
+                              <div className="flex items-center space-x-2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span>Done</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {task?.has_dependencies && !task?.dependencies_completed && (
+                          <div className="flex items-center space-x-2 mt-2 text-yellow-500 text-sm">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>
+                              Complete dependencies before changing status
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Time tracking summary */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Time Spent</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-blue-500" />
+                            <span className="font-medium">{totalHours.toFixed(1)} hours</span>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditingDueDate(true)}
+                            onClick={() => setIsTimeTrackingOpen(true)}
                           >
-                            <Edit className="h-4 w-4" />
+                            Manage
                           </Button>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
 
-                  {/* Dependency section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Task Dependencies</CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-hidden">
-                      {task && userData?.user && (
-                        <div className="max-h-[200px] overflow-y-auto">
-                          <div className="w-full">
-                            <TaskDependencySelector
+                    {/* Priority section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Priority</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Select
+                          value={task?.priority || "medium"}
+                          onValueChange={handlePriorityChange}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                <>
+                                  <div className="flex items-center space-x-2">
+                                    {getPriorityColor(task?.priority || null)}
+                                    <span className="capitalize">
+                                      {task?.priority?.replace("_", " ") || "Medium"}
+                                    </span>
+                                  </div>
+                                </>
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                                <span>Low</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="medium">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                <span>Medium</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="high">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                                <span>High</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="urgent">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-2 h-2 bg-red-500 rounded-full" />
+                                <span>Urgent</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </CardContent>
+                    </Card>
+
+                    {/* Due date section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Due Date</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {editingDueDate ? (
+                          <div className="flex flex-col space-y-2">
+                            <Input
+                              id="due-date"
+                              type="datetime-local"
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className="w-full"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                  setEditingDueDate(false);
+                                  setDueDate(task?.due_date || "");
+                                }}>
+                                Cancel
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={handleUpdateDueDate}>
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="truncate text-sm">
+                              {task?.due_date
+                                ? new Date(task.due_date).toLocaleString()
+                                : "No due date set"}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingDueDate(true)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Dependency section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Task Dependencies</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {task && userData?.user && (
+                          <TaskDependencySelector
+                            taskId={task.id}
+                            userId={userData?.user?.id || ""}
+                            onDependenciesChange={() => {
+                              if (onSubtasksChange) onSubtasksChange();
+                            }}
+                            scrollCurrentDependencies={true}
+                          />
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Attachments section */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Attachments</CardTitle>
+                      </CardHeader>
+                      <CardContent className="overflow-hidden">
+                        {task && (
+                          <div className="max-h-[200px] overflow-y-auto">
+                            <TaskAttachments
                               taskId={task.id}
-                              userId={userData?.user?.id || ""}
-                              onDependenciesChange={() => {
-                                if (onSubtasksChange) onSubtasksChange();
-                              }}
+                              attachments={attachments}
+                              onAttachmentAdded={() => fetchAttachments()}
+                              onAttachmentDeleted={() => fetchAttachments()}
                             />
                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                  {/* Attachments section */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Attachments</CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-hidden">
-                      {task && (
-                        <div className="max-h-[200px] overflow-y-auto">
-                          <TaskAttachments
-                            taskId={task.id}
-                            attachments={attachments}
-                            onAttachmentAdded={() => fetchAttachments()}
-                            onAttachmentDeleted={() => fetchAttachments()}
+                    {/* Other sections */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Team</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {userTeams.length > 0 ? (
+                          <TeamSelector 
+                            teams={userTeams}
+                            value={task?.team_id || null}
+                            onChange={handleTeamChange}
                           />
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate text-sm">{teamName || "No team"}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                  {/* Other sections */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Team</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {userTeams.length > 0 ? (
-                        <TeamSelector 
-                          teams={userTeams}
-                          value={task?.team_id || null}
-                          onChange={handleTeamChange}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate text-sm">{teamName || "No team"}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Assigned To</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {task?.team_id ? (
-                        <UserAssignmentSelector
-                          teamId={task.team_id}
-                          value={task.assigned_to || null}
-                          onChange={handleAssigneeChange}
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <UserCircle className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate text-sm">Select a team first</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-md">Assigned To</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {task?.team_id ? (
+                          <UserAssignmentSelector
+                            teamId={task.team_id}
+                            value={task.assigned_to || null}
+                            onChange={handleAssigneeChange}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate text-sm">Select a team first</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="comments" className="space-y-4">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-md">Comments</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {task && (
-                        <TaskComments
-                          taskId={task.id}
-                          teamId={task.team_id || null}
-                          currentUser={userData?.user}
-                        />
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="comments" className="flex-1 mt-4 overflow-auto data-[state=active]:flex data-[state=active]:flex-col">
+                <Card className="flex-1 min-h-0 flex flex-col">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-md">Comments</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-1 overflow-auto">
+                    {task && (
+                      <TaskComments
+                        taskId={task.id}
+                        teamId={task.team_id || null}
+                        currentUser={userData?.user}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
 

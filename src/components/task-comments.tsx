@@ -116,6 +116,15 @@ export default function TaskComments({
   const [cursorPosition, setCursorPosition] = useState(0);
   const [triggeredMention, setTriggeredMention] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const commentsContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Scroll to the latest comment when comments are loaded or added
+  useEffect(() => {
+    if (comments.length > 0 && commentsContainerRef.current) {
+      const container = commentsContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [comments.length]);
   
   // Load comments and team members on mount
   useEffect(() => {
@@ -440,6 +449,13 @@ export default function TaskComments({
       
       setNewComment("");
       fetchComments(); // Refresh comments
+      
+      // Scroll to the bottom after adding a comment
+      setTimeout(() => {
+        if (commentsContainerRef.current) {
+          commentsContainerRef.current.scrollTop = commentsContainerRef.current.scrollHeight;
+        }
+      }, 300); // Small delay to allow comments to load
     } catch (error) {
       console.error('Error adding comment:', error);
     }
@@ -482,119 +498,124 @@ export default function TaskComments({
   };
   
   return (
-    <div className="flex flex-col gap-4 w-full">
-      <h3 className="text-lg font-medium">Comments</h3>
+    <div className="flex flex-col h-full">
       
-      {/* Comments list */}
-      <div className="space-y-4 max-h-[400px] overflow-y-auto p-1">
-        {isLoading ? (
-          <div className="text-center text-muted-foreground">Loading comments...</div>
-        ) : comments.length === 0 ? (
-          <div className="text-center text-muted-foreground">No comments yet. Be the first to comment!</div>
-        ) : (
-          comments.map((comment) => (
-            <div key={comment.id} className="flex gap-3 group">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={comment.user_avatar_url || ''} alt={comment.user_name || comment.user_email || ''} />
-                <AvatarFallback>{getUserInitials(comment.user_name, comment.user_email)}</AvatarFallback>
-              </Avatar>
-              
-              <div className="flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-medium">{comment.user_name || comment.user_email}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                  </span>
+      {/* Scrollable container with auto-scroll to latest comment */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-y-auto min-h-[150px]" id="comments-container" ref={commentsContainerRef}>
+          <div className="space-y-4 p-1 pb-4">
+            {isLoading ? (
+              <div className="text-center text-muted-foreground">Loading comments...</div>
+            ) : comments.length === 0 ? (
+              <div className="text-center text-muted-foreground">No comments yet. Be the first to comment!</div>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3 group">
+                  <Avatar className="w-8 h-8">
+                    <AvatarImage src={comment.user_avatar_url || ''} alt={comment.user_name || comment.user_email || ''} />
+                    <AvatarFallback>{getUserInitials(comment.user_name, comment.user_email)}</AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium">{comment.user_name || comment.user_email}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    
+                    <div 
+                      className="mt-1"
+                      dangerouslySetInnerHTML={{ __html: formatCommentContent(comment.content) }}
+                    />
+                  </div>
+                  
+                  {(comment.user_id === currentUser.id) && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Comment</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this comment? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete comment</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
-                
-                <div 
-                  className="mt-1"
-                  dangerouslySetInnerHTML={{ __html: formatCommentContent(comment.content) }}
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Comment form - Fixed at bottom */}
+      <div className="mt-2 border-t pt-3">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Input
+              ref={inputRef}
+              value={newComment}
+              onChange={handleCommentChange}
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUp}
+              onClick={handleInputClick}
+              placeholder="Add a comment..."
+              className="pr-10"
+            />
+            
+            {showSuggestions && teamId && (
+              <div className="absolute z-10 w-60 mt-1">
+                <UserSuggestionList
+                  users={teamMembers}
+                  query={mentionQuery}
+                  onSelectUser={handleSelectUser}
                 />
               </div>
-              
-              {(comment.user_id === currentUser.id) && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Comment</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this comment? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteComment(comment.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Delete comment</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          ))
+            )}
+          </div>
+          <Button 
+            type="button" 
+            size="icon"
+            onClick={handleSubmitComment}
+            disabled={!newComment.trim()}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        {teamId && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Tip: Use @username to mention team members
+          </p>
         )}
       </div>
-      
-      {/* Comment form */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Input
-            ref={inputRef}
-            value={newComment}
-            onChange={handleCommentChange}
-            onKeyDown={handleKeyDown}
-            onKeyUp={handleKeyUp}
-            onClick={handleInputClick}
-            placeholder="Add a comment..."
-            className="pr-10"
-          />
-          
-          {showSuggestions && teamId && (
-            <div className="absolute z-10 w-60 mt-1">
-              <UserSuggestionList
-                users={teamMembers}
-                query={mentionQuery}
-                onSelectUser={handleSelectUser}
-              />
-            </div>
-          )}
-        </div>
-        <Button 
-          type="button" 
-          size="icon"
-          onClick={handleSubmitComment}
-          disabled={!newComment.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
-      
-      {teamId && (
-        <p className="text-xs text-muted-foreground mt-1">
-          Tip: Use @username to mention team members
-        </p>
-      )}
     </div>
   );
 } 

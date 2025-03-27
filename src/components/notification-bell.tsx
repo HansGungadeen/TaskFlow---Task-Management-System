@@ -190,8 +190,7 @@ export function NotificationBell({ userId }: { userId: string }) {
     // Navigate based on notification type
     if (notification.related_task_id) {
       // Navigate to task
-      // We'll need to add a task URL parameter to the dashboard
-      router.push(`/dashboard?task=${notification.related_task_id}`);
+      router.push(`/dashboard?taskId=${notification.related_task_id}`);
     } else if (notification.related_team_id) {
       // Navigate to team
       router.push(`/teams/${notification.related_team_id}`);
