@@ -44,21 +44,26 @@ import {
   AlertTriangle,
   Users,
   UserCircle,
+  Pencil,
+  Save,
+  Trash,
+  Trash2,
+  Edit,
+  Plus,
+  TimerOff,
+  Timer,
+  BarChart3,
+  X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import TaskDependencySelector from "./task-dependency-selector";
-import {
-  Trash2,
-  Plus,
-  Edit,
-  Save,
-  X,
-} from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import TaskComments from "./task-comments";
 import TimeTracking from "./time-tracking";
 import { TaskAttachments } from "./TaskAttachments";
+import TeamSelector from "./team-selector";
+import UserAssignmentSelector from "./user-assignment-selector";
 
 type TaskViewCardProps = {
   task: Task | null;
@@ -89,6 +94,7 @@ export default function TaskViewCard({
   const [totalHours, setTotalHours] = useState(0);
   const [isTimeTrackingOpen, setIsTimeTrackingOpen] = useState(false);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [userTeams, setUserTeams] = useState<{id: string, name: string}[]>([]);
   const supabase = createClient();
   const { theme } = useTheme();
 
@@ -97,10 +103,60 @@ export default function TaskViewCard({
     const fetchUserData = async () => {
       const { data } = await supabase.auth.getUser();
       setUserData(data);
+      
+      // Fetch user's teams
+      if (data?.user?.id) {
+        await fetchUserTeams(data.user.id);
+      }
     };
 
     fetchUserData();
   }, [supabase.auth]);
+
+  // Fetch user's teams
+  const fetchUserTeams = async (userId: string) => {
+    try {
+      // Fetch teams created by the user
+      const { data: ownedTeams, error: ownedError } = await supabase
+        .from("teams")
+        .select("id, name")
+        .eq("created_by", userId);
+
+      if (ownedError) throw ownedError;
+
+      // Fetch teams the user is a member of
+      const { data: memberTeams, error: memberError } = await supabase
+        .from("team_members")
+        .select(`
+          team_id,
+          teams:team_id (
+            id, 
+            name
+          )
+        `)
+        .eq("user_id", userId);
+
+      if (memberError) throw memberError;
+
+      // Combine teams
+      const teams = [
+        ...(ownedTeams || []).map(team => ({ id: team.id, name: team.name })),
+        ...(memberTeams || []).filter(item => item.teams).map(item => ({ 
+          id: (item.teams as any).id, 
+          name: (item.teams as any).name 
+        }))
+      ];
+
+      // Remove duplicates (if any)
+      const uniqueTeams = teams.filter((team, index, self) => 
+        index === self.findIndex(t => t.id === team.id)
+      );
+
+      setUserTeams(uniqueTeams);
+    } catch (error) {
+      console.error("Error fetching user teams:", error);
+    }
+  };
 
   // Set due date when task changes
   useEffect(() => {
@@ -189,39 +245,37 @@ export default function TaskViewCard({
     }
   }, [task, supabase]);
 
-  // Fetch attachments when dialog opens or task changes
-  useEffect(() => {
-    const fetchAttachments = async () => {
-      if (!task) return;
+  // Create a reusable function to fetch attachments
+  const fetchAttachments = async () => {
+    if (!task) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('task_attachments')
+        .select(`
+          *,
+          user:users(name, email)
+        `)
+        .eq('task_id', task.id)
+        .order('created_at', { ascending: false });
 
-      console.log('DEBUG - Starting fetchAttachments for task:', task.id);
-
-      try {
-        console.log('DEBUG - Querying task_attachments table');
-        const { data, error } = await supabase
-          .from('task_attachments')
-          .select(`
-            *,
-            user:users(name, email)
-          `)
-          .eq('task_id', task.id)
-          .order('created_at', { ascending: false });
-
-        console.log('DEBUG - Attachment query results:', { data, error });
-        
-        if (error) throw error;
-        setAttachments(data || []);
-        console.log('DEBUG - Attachments set to state:', data || []);
-      } catch (error) {
+      if (error) {
         console.error('Error fetching attachments:', error);
+        return;
       }
-    };
 
-    if (task && isOpen) {
-      console.log('DEBUG - Task is open, fetching attachments');
+      setAttachments(data || []);
+    } catch (error) {
+      console.error('Error fetching attachments:', error);
+    }
+  };
+
+  // Initial fetch of attachments when task changes
+  useEffect(() => {
+    if (task) {
       fetchAttachments();
     }
-  }, [task, isOpen, supabase]);
+  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Function to handle toggling a subtask
   const handleToggleSubtask = async (subtaskId: string, completed: boolean) => {
@@ -474,6 +528,50 @@ export default function TaskViewCard({
   // Handle time update from time tracking component
   const handleTimeUpdate = (updatedTotalHours: number) => {
     setTotalHours(updatedTotalHours);
+  };
+
+  // Function to handle team change
+  const handleTeamChange = async (teamId: string | null) => {
+    if (!task) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ team_id: teamId, assigned_to: null }) // Reset assigned_to when changing team
+        .eq("id", task.id);
+
+      if (error) throw error;
+      
+      if (onSubtasksChange) onSubtasksChange();
+      
+      // Update team name
+      if (teamId) {
+        const team = userTeams.find(team => team.id === teamId);
+        setTeamName(team?.name || null);
+      } else {
+        setTeamName(null);
+      }
+    } catch (error) {
+      console.error("Error updating team:", error);
+    }
+  };
+
+  // Function to handle assignee change
+  const handleAssigneeChange = async (userId: string | null) => {
+    if (!task) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ assigned_to: userId })
+        .eq("id", task.id);
+
+      if (error) throw error;
+      
+      if (onSubtasksChange) onSubtasksChange();
+    } catch (error) {
+      console.error("Error updating assignee:", error);
+    }
   };
 
   return (
@@ -811,47 +909,43 @@ export default function TaskViewCard({
                       <CardTitle className="text-md">Due Date</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-2">
-                        {editingDueDate ? (
-                          <>
-                            <Input
-                              id="due-date"
-                              type="datetime-local"
-                              value={dueDate}
-                              onChange={(e) => setDueDate(e.target.value)}
-                              className="flex-1"
-                            />
-                            <Button variant="ghost" size="sm" onClick={handleUpdateDueDate}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
+                      {editingDueDate ? (
+                        <div className="flex flex-col space-y-2">
+                          <Input
+                            id="due-date"
+                            type="datetime-local"
+                            value={dueDate}
+                            onChange={(e) => setDueDate(e.target.value)}
+                            className="w-full"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => {
                                 setEditingDueDate(false);
                                 setDueDate(task?.due_date || "");
-                              }}
-                            >
-                              <X className="h-4 w-4" />
+                              }}>
+                              Cancel
                             </Button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex-1 text-sm">
-                              {task?.due_date
-                                ? new Date(task.due_date).toLocaleString()
-                                : "No due date set"}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingDueDate(true)}
-                            >
-                              <Edit className="h-4 w-4" />
+                            <Button variant="ghost" size="sm" onClick={handleUpdateDueDate}>
+                              Save
                             </Button>
-                          </>
-                        )}
-                      </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="truncate text-sm">
+                            {task?.due_date
+                              ? new Date(task.due_date).toLocaleString()
+                              : "No due date set"}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingDueDate(true)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -863,13 +957,15 @@ export default function TaskViewCard({
                     <CardContent className="overflow-hidden">
                       {task && userData?.user && (
                         <div className="max-h-[200px] overflow-y-auto">
-                          <TaskDependencySelector
-                            taskId={task.id}
-                            userId={userData?.user?.id || ""}
-                            onDependenciesChange={() => {
-                              if (onSubtasksChange) onSubtasksChange();
-                            }}
-                          />
+                          <div className="w-full">
+                            <TaskDependencySelector
+                              taskId={task.id}
+                              userId={userData?.user?.id || ""}
+                              onDependenciesChange={() => {
+                                if (onSubtasksChange) onSubtasksChange();
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -886,54 +982,8 @@ export default function TaskViewCard({
                           <TaskAttachments
                             taskId={task.id}
                             attachments={attachments}
-                            onAttachmentAdded={() => {
-                              console.log('DEBUG - onAttachmentAdded callback triggered');
-                              const fetchAttachments = async () => {
-                                console.log('DEBUG - Re-fetching attachments after addition');
-                                const { data, error } = await supabase
-                                  .from('task_attachments')
-                                  .select(`
-                                    *,
-                                    user:users(name, email)
-                                  `)
-                                  .eq('task_id', task.id)
-                                  .order('created_at', { ascending: false });
-
-                                if (error) {
-                                  console.error('Error fetching attachments:', error);
-                                  return;
-                                }
-
-                                console.log('DEBUG - New attachments after addition:', data);
-                                setAttachments(data || []);
-                              };
-
-                              fetchAttachments();
-                            }}
-                            onAttachmentDeleted={() => {
-                              console.log('DEBUG - onAttachmentDeleted callback triggered');
-                              const fetchAttachments = async () => {
-                                console.log('DEBUG - Re-fetching attachments after deletion');
-                                const { data, error } = await supabase
-                                  .from('task_attachments')
-                                  .select(`
-                                    *,
-                                    user:users(name, email)
-                                  `)
-                                  .eq('task_id', task.id)
-                                  .order('created_at', { ascending: false });
-
-                                if (error) {
-                                  console.error('Error fetching attachments:', error);
-                                  return;
-                                }
-
-                                console.log('DEBUG - New attachments after deletion:', data);
-                                setAttachments(data || []);
-                              };
-
-                              fetchAttachments();
-                            }}
+                            onAttachmentAdded={() => fetchAttachments()}
+                            onAttachmentDeleted={() => fetchAttachments()}
                           />
                         </div>
                       )}
@@ -946,10 +996,18 @@ export default function TaskViewCard({
                       <CardTitle className="text-md">Team</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate text-sm">{teamName || "No team"}</span>
-                      </div>
+                      {userTeams.length > 0 ? (
+                        <TeamSelector 
+                          teams={userTeams}
+                          value={task?.team_id || null}
+                          onChange={handleTeamChange}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate text-sm">{teamName || "No team"}</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -958,16 +1016,18 @@ export default function TaskViewCard({
                       <CardTitle className="text-md">Assigned To</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-2">
-                        <UserCircle className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate text-sm">
-                          {task?.assignee_data ? (
-                            task.assignee_data.name || task.assignee_data.email || "Unknown User"
-                          ) : (
-                            "Unassigned"
-                          )}
-                        </span>
-                      </div>
+                      {task?.team_id ? (
+                        <UserAssignmentSelector
+                          teamId={task.team_id}
+                          value={task.assigned_to || null}
+                          onChange={handleAssigneeChange}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <UserCircle className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate text-sm">Select a team first</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -976,78 +1036,21 @@ export default function TaskViewCard({
 
             <TabsContent value="comments" className="space-y-4">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium">Comments</h3>
-                    </div>
-                    {task && (
-                      <TaskComments
-                        taskId={task.id}
-                        teamId={task.team_id || null}
-                        currentUser={userData?.user}
-                      />
-                    )}
-                  </div>
-                  <div className="space-y-4">
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-md">Attachments</CardTitle>
-                      </CardHeader>
-                      <CardContent className="overflow-hidden">
-                        {task && (
-                          <div className="max-h-[300px] overflow-y-auto">
-                            <TaskAttachments
-                              taskId={task.id}
-                              attachments={attachments}
-                              onAttachmentAdded={() => {
-                                const fetchAttachments = async () => {
-                                  const { data, error } = await supabase
-                                    .from('task_attachments')
-                                    .select(`
-                                      *,
-                                      user:users(name, email)
-                                    `)
-                                    .eq('task_id', task.id)
-                                    .order('created_at', { ascending: false });
-
-                                  if (error) {
-                                    console.error('Error fetching attachments:', error);
-                                    return;
-                                  }
-
-                                  setAttachments(data || []);
-                                };
-
-                                fetchAttachments();
-                              }}
-                              onAttachmentDeleted={() => {
-                                const fetchAttachments = async () => {
-                                  const { data, error } = await supabase
-                                    .from('task_attachments')
-                                    .select(`
-                                      *,
-                                      user:users(name, email)
-                                    `)
-                                    .eq('task_id', task.id)
-                                    .order('created_at', { ascending: false });
-
-                                  if (error) {
-                                    console.error('Error fetching attachments:', error);
-                                    return;
-                                  }
-
-                                  setAttachments(data || []);
-                                };
-
-                                fetchAttachments();
-                              }}
-                            />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                <div className="grid grid-cols-1">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-md">Comments</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {task && (
+                        <TaskComments
+                          taskId={task.id}
+                          teamId={task.team_id || null}
+                          currentUser={userData?.user}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </TabsContent>

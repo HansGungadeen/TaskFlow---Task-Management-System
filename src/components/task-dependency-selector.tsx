@@ -266,42 +266,44 @@ export default function TaskDependencySelector({
   }
 
   return (
-    <div className="space-y-2">
-      {dependencies.length > 0 && (
-        <div className="mt-4">
+    <div className="space-y-4">
+      {dependencies.length === 0 ? (
+        <div className="text-sm text-muted-foreground mb-2">No dependencies set</div>
+      ) : (
+        <div>
           <h3 className="text-sm font-medium mb-2">Current Dependencies</h3>
           <div className="space-y-2">
             {dependencies.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center justify-between p-2 rounded-md border bg-background"
+                className="flex flex-wrap items-center justify-between p-2 rounded-md border bg-background"
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className={`w-2 h-2 rounded-full ${
+                <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+                  <span className={`w-2 h-2 flex-shrink-0 rounded-full ${
                     task.status === "done" 
                       ? "bg-green-500" 
                       : task.status === "in_progress" 
                         ? "bg-blue-500" 
                         : "bg-gray-500"
                   }`} />
-                  <span className="truncate">{task.title}</span>
-                  {task.team_name && (
-                    <span className="text-xs text-muted-foreground">
-                      ({task.team_name})
-                    </span>
-                  )}
+                  <span className="truncate font-medium text-sm">{task.title}</span>
                 </div>
-                <div className="flex items-center">
+                {task.team_name && (
+                  <span className="text-xs text-muted-foreground ml-4 mr-auto">
+                    {task.team_name}
+                  </span>
+                )}
+                <div className="flex items-center mt-1 md:mt-0 ml-auto">
                   <Badge
                     variant="outline"
-                    className={`mr-2 text-xs ${getStatusColor(task.status)}`}
+                    className={`mr-2 text-xs whitespace-nowrap ${getStatusColor(task.status)}`}
                   >
                     {getStatusText(task.status)}
                   </Badge>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 flex-shrink-0"
                     onClick={() => removeDependency(task.id)}
                   >
                     <X className="h-4 w-4" />
@@ -311,10 +313,6 @@ export default function TaskDependencySelector({
             ))}
           </div>
         </div>
-      )}
-
-      {dependencies.length === 0 && (
-        <div className="text-sm text-muted-foreground mb-2">No dependencies set</div>
       )}
 
       <Popover open={open} onOpenChange={setOpen}>
@@ -330,7 +328,7 @@ export default function TaskDependencySelector({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-2 w-[350px]" align="start">
+        <PopoverContent className="p-2 w-[calc(100vw-2rem)] max-w-[350px]" align="start">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Command className="rounded-lg border flex-1">
@@ -363,7 +361,7 @@ export default function TaskDependencySelector({
                       <div className="flex items-start gap-2">
                         <Checkbox
                           id={`task-${task.id}`}
-                          className="mt-1"
+                          className="mt-1 flex-shrink-0"
                           checked={false}
                           onCheckedChange={() => {
                             addDependency(task.id);
@@ -374,16 +372,16 @@ export default function TaskDependencySelector({
                             e.stopPropagation();
                           }}
                         />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <label 
                             htmlFor={`task-${task.id}`}
-                            className="text-sm font-medium block cursor-pointer"
+                            className="text-sm font-medium block cursor-pointer truncate"
                           >
                             {task.title}
                           </label>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
                             <span
-                              className="text-xs px-1.5 py-0.5 rounded-md"
+                              className="text-xs px-1.5 py-0.5 rounded-md whitespace-nowrap"
                               style={{ 
                                 backgroundColor: task.status === 'todo' ? '#f3f4f6' : 
                                                 task.status === 'in_progress' ? '#fef3c7' : 
@@ -396,8 +394,8 @@ export default function TaskDependencySelector({
                               {getStatusText(task.status)}
                             </span>
                             {task.team_name && (
-                              <span className="text-xs text-muted-foreground">
-                                Team: {task.team_name}
+                              <span className="text-xs text-muted-foreground truncate">
+                                {task.team_name}
                               </span>
                             )}
                           </div>

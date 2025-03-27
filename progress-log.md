@@ -132,6 +132,50 @@
 - Real-time team inbox communication
 
 ## Recent Enhancements
+- **Fixed File Attachment Functionality:**
+  - Resolved Row-Level Security (RLS) policy issues for task attachments
+  - Updated storage policies for the task-attachments bucket
+  - Improved error handling for file uploads and deletions
+  - Enhanced user authentication checks for attachment actions
+  - Created proper database migration scripts for permission fixes
+
+- **Improved Dashboard Filter System:**
+  - Redesigned filter UI with intuitive button-based date filters
+  - Added consistent labels and styling for all filter types
+  - Implemented proper responsive layout across all screen sizes
+  - Fixed filter clustering issues on wide screens
+  - Enhanced filter controls with better spacing and visual hierarchy
+  - Added assignee filter with "Assigned to Me" and "Unassigned" options
+
+- **Enhanced Dark Mode Support:**
+  - Fixed color scheme inconsistencies in dark mode for the list view
+  - Updated background colors to use theme variables instead of hardcoded colors
+  - Improved contrast for text elements in dark mode
+  - Added proper dark mode variants for status icons and priority indicators
+  - Made all UI elements respect the theme settings consistently
+
+- **Improved Team Management Interface:**
+  - Enhanced team cards with better spacing and visual hierarchy
+  - Added better responsive behavior for team views
+  - Improved information display with team role badges
+  - Fixed layout alignment issues in the team management screens
+  - Enhanced visual separation between UI sections
+
+- **Integrated Activity Timeline into Task View:**
+  - Added dedicated History tab in the task view alongside Details and Comments
+  - Implemented chronological timeline of all task changes with visual indicators
+  - Color-coded activity markers for different types of changes (status updates, assignments, field edits)
+  - Enhanced user experience by bringing activity history directly into the task view
+  - Consistent styling with the rest of the application interface
+  - Improved task management context with complete audit trail visibility
+
+- **Fixed Layout Alignment Issues:**
+  - Resolved task dependencies and attachment cards misalignment when resized
+  - Added proper overflow handling for content sections
+  - Improved responsive behavior for task cards and modals
+  - Enhanced content spacing for better readability
+  - Fixed UI element positioning across different screen sizes
+
 - **Added Calendar View for better task scheduling:**
   - Month and week view options
   - Jira-inspired UI with color-coded task cards
@@ -142,6 +186,7 @@
   - Team filtering in calendar view
   - Responsive design for all device sizes
   - Real-time updates with Supabase subscriptions
+
 - Added in-place task editing in team detail view
 - Implemented subtask management directly in team view
 - Added subtask completion progress visualization
@@ -149,6 +194,7 @@
 - Implemented multi-task linking in team inbox messages
 - Created intelligent message parsing to display linked tasks
 - Improved task context preservation when navigating between views
+
 - **Enhanced Kanban Board with comprehensive task management:**
   - Added task history button for viewing complete audit trails directly from task cards
   - Implemented subtask visualization with progress bars and count badges
@@ -159,6 +205,20 @@
   - Implemented visual feedback for task updates during drag operations
 
 ## Recent Fixes
+- **Fixed File Attachment Issues:**
+  - Resolved cookie parsing errors affecting file uploads
+  - Fixed missing RLS policies for task_attachments table
+  - Corrected storage bucket permissions for proper file access
+  - Implemented proper error handling for attachment operations
+  - Added enhanced logging for better debugging of file operations
+
+- **Fixed UI Layout and Alignment Issues:**
+  - Corrected filter UI alignment in dashboard views
+  - Fixed responsive layout issues on various screen sizes
+  - Resolved task dependencies and attachment cards misalignment
+  - Fixed dark mode color inconsistencies across components
+  - Improved layout of team cards and team management screens
+
 - Fixed foreign key constraint issues with mentions and notifications
 - Implemented sync mechanism between auth.users and public.users tables
 - Improved error handling in database functions
@@ -169,16 +229,26 @@
 - Fixed task card display issues with proper null checking for missing data
 
 ## Future Enhancements
-- File attachments for tasks
-- Advanced filtering and sorting options
-- Mobile app version
+- Comprehensive global activity feed for system-wide events
+- Advanced filtering and sorting options for all views
+- Mobile app version with push notifications
 - Email notifications for task assignments and updates
-- Task completion analytics and reporting
+- Task completion analytics and reporting dashboards
+- Team performance metrics and activity visualization
+- Integration with calendar services (Google Calendar, Outlook)
+- Advanced recurring task scheduling
+- AI-assisted task prioritization and workload balancing
 
 # start chat like this
-- read the current project and get up to speed on all the feature implemented, and check my supabase database schema for a better understanding of how the project backend works
+- read the current project and get up to speed on all the feature implemented, and check my supabase database schema for a better understanding of how the project backend works. i have also given you access to my browser.
 
 # run dev
 - npm run dev
 
+# Browser tools MCP
+- Open cmd in C:\Users\hansg\.cursor\browser-tools-mcp
+- npx @agentdeskai/browser-tools-server@latest
+
+# to fix next
+- the view task card has a history tab that nedds fixing
 
