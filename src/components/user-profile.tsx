@@ -1,5 +1,5 @@
 "use client";
-import { UserCircle, Sun, Moon, Laptop } from "lucide-react";
+import { UserCircle, Sun, Moon, Laptop, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import { createClient } from "../../supabase/client";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function UserProfile() {
   const supabase = createClient();
@@ -52,6 +53,13 @@ export default function UserProfile() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <Link href="/dashboard/profile">
+          <DropdownMenuItem className="cursor-pointer flex items-center gap-2">
+            <Settings size={16} />
+            Edit Profile
+          </DropdownMenuItem>
+        </Link>
+        <DropdownMenuSeparator />
         {mounted && (
           <>
             <DropdownMenuItem
