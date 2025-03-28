@@ -35,7 +35,8 @@ import {
   Pencil,
   Save,
   Plus,
-  Trash2
+  Trash2,
+  BarChart2
 } from "lucide-react";
 import {
   Dialog,
@@ -735,6 +736,13 @@ export default function TeamDetail({
           <ListTodo className="h-4 w-4" />
           <span>Manage Tasks</span>
         </Button>
+
+        <Link href={`/teams/${team.id}/analytics`}>
+          <Button variant="outline" className="flex items-center gap-2">
+            <BarChart2 className="h-4 w-4" />
+            <span>Analytics</span>
+          </Button>
+        </Link>
 
         {userRole === "admin" && (
           <Button
@@ -1542,7 +1550,7 @@ export default function TeamDetail({
               <div>
                 <Label htmlFor="edit-task-assignee">Assigned To</Label>
                 <UserAssignmentSelector 
-                  teamId={editedTask.team_id}
+                  teamId={typeof editedTask.team_id === 'string' ? editedTask.team_id : null}
                   value={editedTask.assigned_to || null}
                   onChange={(userId) => setEditedTask({ ...editedTask, assigned_to: userId })}
                 />
