@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TaskExport } from "@/components/task-export";
 
 export default async function Dashboard({ 
   searchParams 
@@ -130,6 +131,9 @@ export default async function Dashboard({
                 <span>Manage Teams</span>
               </Button>
             </Link>
+            {processedTasks?.length > 0 && (
+              <TaskExport tasks={processedTasks} buttonSize="sm" />
+            )}
           </div>
         </div>
         <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">

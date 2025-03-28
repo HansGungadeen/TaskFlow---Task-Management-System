@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid, Calendar, Menu, X, BarChart2 } from "lucide-react";
+import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid, Calendar, Menu, X, BarChart2, Clock } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import UserProfile from "./user-profile";
@@ -93,6 +93,17 @@ export default function DashboardNavbar() {
               )}
             >
               <BarChart2 className="h-4 w-4 mr-1" /> Analytics
+            </Link>
+            <Link
+              href="/reports"
+              className={cn(
+                "hover:text-foreground flex items-center",
+                pathname === "/reports" 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
+            >
+              <Clock className="h-4 w-4 mr-1" /> Time Reports
             </Link>
             <Link
               href="/teams"
@@ -182,6 +193,18 @@ export default function DashboardNavbar() {
               onClick={() => setMobileMenuOpen(false)}
             >
               <BarChart2 className="h-4 w-4 mr-2" /> Analytics
+            </Link>
+            <Link
+              href="/reports"
+              className={cn(
+                "hover:text-foreground flex items-center py-2",
+                pathname === "/reports" 
+                  ? "text-foreground font-medium" 
+                  : "text-muted-foreground"
+              )}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Clock className="h-4 w-4 mr-2" /> Time Reports
             </Link>
             <Link
               href="/teams"

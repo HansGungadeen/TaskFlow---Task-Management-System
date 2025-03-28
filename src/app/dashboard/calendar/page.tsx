@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../../../supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { TaskExport } from "@/components/task-export";
 
 export default async function CalendarView({ 
   searchParams 
@@ -119,6 +120,7 @@ export default async function CalendarView({
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Calendar View</h1>
           <div className="flex gap-2">
+            {processedTasks.length > 0 && <TaskExport tasks={processedTasks} />}
             <Link href="/dashboard">
               <Button variant="outline" className="flex items-center gap-2">
                 <UserCircle className="h-4 w-4" />

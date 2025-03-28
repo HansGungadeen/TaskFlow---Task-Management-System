@@ -106,6 +106,7 @@ export default function TeamManagement({
   // Set isClient to true once component mounts
   useEffect(() => {
     setIsClient(true);
+    console.log("Initial member teams received:", memberTeams);
     // Load member teams data when component mounts
     if (currentUserId) {
       loadMemberTeams();

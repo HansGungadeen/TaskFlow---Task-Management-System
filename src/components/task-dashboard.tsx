@@ -24,6 +24,8 @@ import {
   History,
   Users,
   Calendar,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +59,7 @@ import { Badge } from "./ui/badge";
 import UserAssignmentSelector from "./user-assignment-selector";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { AssigneeData, Task as TaskType, TaskStatus, TaskPriority } from "@/types/tasks";
+import { TaskExport } from "./task-export";
 
 type Subtask = {
   id: string;
@@ -254,9 +257,10 @@ export default function TaskDashboard({
     fetchTaskDependenciesAndSubtasks();
   }, [tasks.length]);
 
-  // Apply filters when tasks, dueDateFilter, or teamFilter changes
+  // Filter the tasks based on filters
   useEffect(() => {
-    let filtered = tasks;
+    // Apply the filters
+    let filtered = [...tasks];
     
     // Apply due date filter if set
     if (dueDateFilter) {
@@ -313,7 +317,7 @@ export default function TaskDashboard({
     }
     
     setFilteredTasks(filtered);
-  }, [tasks, dueDateFilter, teamFilter, assigneeFilter, userId]);
+  }, [tasks, dueDateFilter, teamFilter, assigneeFilter]);
 
   // Fetch team members when a team is selected
   useEffect(() => {
@@ -1203,6 +1207,76 @@ export default function TaskDashboard({
           }
         }}
       />
+
+      {/* Task Filters */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          <DueDateFilter value={dueDateFilter} onChange={setDueDateFilter} />
+
+          {userTeams.length > 0 && (
+            <Select
+              value={teamFilter || "all"}
+              onValueChange={(value) => setTeamFilter(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {userTeams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Select
+            value={assigneeFilter || "all"}
+            onValueChange={(value) => setAssigneeFilter(value === "all" ? null : value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Assigned To" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tasks</SelectItem>
+              <SelectItem value="none">Unassigned</SelectItem>
+              <SelectItem value={userId || ""}>My Tasks</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <TaskExport tasks={filteredTasks} buttonSize="sm" />
+          
+          <div className="border rounded-md flex">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              className="rounded-r-none"
+              size="sm"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              className="rounded-l-none"
+              size="sm"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Button
+            onClick={() => setIsCreating(true)}
+            className="flex gap-1 items-center"
+          >
+            <Plus className="h-4 w-4" /> Add Task
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
