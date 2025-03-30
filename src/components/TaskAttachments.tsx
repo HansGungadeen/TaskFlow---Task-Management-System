@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Upload, File, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { formatFileSize } from '@/lib/utils'
 import { createClient } from '@/utils/utils' // Import the same client used in task-view-card
+import { formatFileSize } from '@/lib/utils'
 
 interface TaskAttachment {
   id: string
