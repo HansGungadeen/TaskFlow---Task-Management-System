@@ -275,5 +275,5 @@
 - npx @agentdeskai/browser-tools-server@latest
 
 # to fix next
-- the view task card has a history tab that nedds fixing
+- fix the dashboard view and make everything more uniform and responsive
 
