@@ -100,14 +100,14 @@ export default function TaskDashboard({
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [viewTaskOpen, setViewTaskOpen] = useState(false);
-  const [newTask, setNewTask] = useState({
+  const [newTask, setNewTask] = useState<Partial<TaskType>>({
     title: "",
     description: "",
     status: "todo" as TaskStatus,
     priority: "medium" as TaskPriority,
-    due_date: null as string | null,
-    team_id: null as string | null,
-    assigned_to: null as string | null,
+    due_date: null,
+    team_id: null,
+    assigned_to: null,
   });
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [dueDateFilter, setDueDateFilter] = useState<string | null>(null);
@@ -408,40 +408,40 @@ export default function TaskDashboard({
   };
 
   const handleCreateTask = async () => {
-    if (!newTask.title.trim()) return;
+    if (!newTask.title) {
+      console.error("Task title is required");
+      return;
+    }
 
     try {
-      const { data, error } = await supabase
+      const { data: task, error } = await supabase
         .from("tasks")
-        .insert([
-          {
-            title: newTask.title.trim(),
-            description: newTask.description.trim() || null,
-            status: newTask.status,
-            priority: newTask.priority,
-            due_date: newTask.due_date,
-            team_id: newTask.team_id,
-            assigned_to: newTask.assigned_to,
-            user_id: userId,
-          },
-        ])
-        .select();
+        .insert({
+          title: newTask.title,
+          description: newTask.description || "",
+          status: newTask.status || "todo",
+          priority: newTask.priority || "medium",
+          due_date: newTask.due_date,
+          team_id: newTask.team_id,
+          assigned_to: newTask.assigned_to,
+          user_id: userId || "",
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      if (data && data[0]) {
-        setTasks([data[0], ...tasks]);
-        setNewTask({
-          title: "",
-          description: "",
-          status: "todo",
-          priority: "medium",
-          due_date: null,
-          team_id: null,
-          assigned_to: null,
-        });
-        setIsCreating(false);
-      }
+      setTasks((prev) => [...prev, task]);
+      setIsCreating(false);
+      setNewTask({
+        title: "",
+        description: "",
+        status: "todo",
+        priority: "medium",
+        due_date: null,
+        team_id: null,
+        assigned_to: null,
+      });
     } catch (error) {
       console.error("Error creating task:", error);
     }
@@ -617,225 +617,107 @@ export default function TaskDashboard({
   };
 
   // Render task form (new or edit)
-  const renderTaskForm = () => {
-    const isNewTask = !isEditing;
+  const renderTaskForm = (isNewTask: boolean) => {
     const task = isNewTask ? newTask : currentTask;
-    const setTask = isNewTask
-      ? setNewTask
-      : (updates: Partial<Task>) =>
-          setCurrentTask((prev) => ({ ...prev!, ...updates }));
-    const handleSubmit = isNewTask ? handleCreateTask : handleUpdateTask;
-
     if (!task) return null;
 
+    const setTaskValue = (updates: Partial<TaskType>) => {
+      if (isNewTask) {
+        setNewTask(prev => ({ ...prev, ...updates }));
+      } else if (currentTask) {
+        setCurrentTask(prev => prev ? { ...prev, ...updates } as Task : null);
+      }
+    };
+
     return (
-      <div className="flex flex-col gap-4">
-        <div>
-          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-title`}>
-            Title
-          </Label>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-title`}>Title</Label>
           <Input
             id={`${isNewTask ? "new" : "edit"}-task-title`}
-            value={task.title}
-            onChange={(e) => setTask({ ...task, title: e.target.value })}
+            value={task.title || ""}
+            onChange={(e) => setTaskValue({ title: e.target.value })}
             placeholder="Enter task title"
             className="mt-1"
           />
-        </div>
-
-        <div>
           <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-description`}>
             Description
           </Label>
           <Textarea
             id={`${isNewTask ? "new" : "edit"}-task-description`}
             value={task.description || ""}
-            onChange={(e) =>
-              setTask({ ...task, description: e.target.value })
-            }
+            onChange={(e) => setTaskValue({ description: e.target.value })}
             placeholder="Enter task description"
             className="mt-1"
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-status`}>
-              Status
-            </Label>
-            <Select
-              value={task.status}
-              onValueChange={(value) =>
-                setTask({
-                  ...task,
-                  status: value as TaskStatus,
-                })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todo">To Do</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={task.status || "todo"}
+                onValueChange={(value: TaskStatus) => setTaskValue({ status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todo">To Do</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="done">Done</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <Select
+                value={task.priority || "medium"}
+                onValueChange={(value: string) => setTaskValue({ priority: value as TaskPriority })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
           <div>
-            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-priority`}>
-              Priority
-            </Label>
-            <Select
-              value={task.priority || "medium"}
-              onValueChange={(value) =>
-                setTask({
-                  ...task,
-                  priority: value as TaskPriority,
-                })
-              }
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-due-date`}>
-            Due Date
-          </Label>
-          <Input
-            id={`${isNewTask ? "new" : "edit"}-task-due-date`}
-            type="date"
-            value={task.due_date || ""}
-            onChange={(e) => setTask({ ...task, due_date: e.target.value })}
-            className="mt-1"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-team`}>
-            Team
-          </Label>
-          <TeamSelector
-            teams={userTeams}
-            value={task.team_id}
-            onChange={(teamId) => setTask({ ...task, team_id: teamId, assigned_to: null })}
-          />
-        </div>
-
-        {task.team_id && (
-          <div>
-            <Label htmlFor={`${isNewTask ? "new" : "edit"}-task-assignee`}>
-              Assigned To
-            </Label>
-            <UserAssignmentSelector 
-              teamId={task.team_id}
-              value={task.assigned_to || null}
-              onChange={(userId) => setTask({ ...task, assigned_to: userId })}
+            <Label>Due Date</Label>
+            <Input
+              type="date"
+              value={task.due_date || ""}
+              onChange={(e) => setTaskValue({ due_date: e.target.value || null })}
+              className="mt-1"
             />
           </div>
-        )}
-
-        {/* Show dependencies and subtasks only in edit mode */}
-        {!isNewTask && currentTask && (
-          <>
+          <div>
+            <Label>Team</Label>
+            <TeamSelector
+              teams={userTeams}
+              value={task.team_id || null}
+              onChange={(teamId) => setTaskValue({ team_id: teamId, assigned_to: null })}
+            />
+          </div>
+          {task.team_id && (
             <div>
-              <Label htmlFor="edit-dependencies">Task Dependencies</Label>
-              <div className="mt-1">
-                <TaskDependencySelector
-                  taskId={currentTask.id}
-                  userId={userId || ""}
-                  onDependenciesChange={() => {
-                    // Fetch updated task dependencies without causing a re-render loop
-                    const fetchUpdatedDependencies = async () => {
-                      try {
-                        const { data: updatedTasksData } = await supabase
-                          .from("tasks")
-                          .select("*")
-                          .eq("user_id", userId || "");
-
-                        if (updatedTasksData) {
-                          // Only update if there are actual changes
-                          const hasChanges =
-                            JSON.stringify(updatedTasksData) !==
-                            JSON.stringify(tasks);
-                          if (hasChanges) {
-                            setTasks(updatedTasksData);
-                          }
-                        }
-                      } catch (error) {
-                        console.error("Error refreshing tasks:", error);
-                      }
-                    };
-
-                    fetchUpdatedDependencies();
-                  }}
-                />
-              </div>
+              <Label>Assign To</Label>
+              <UserAssignmentSelector
+                teamId={task.team_id}
+                value={task.assigned_to || null}
+                onChange={(userId) => setTaskValue({ assigned_to: userId })}
+              />
             </div>
-
-            <div>
-              <Label htmlFor="edit-subtasks">Subtasks</Label>
-              <div className="mt-1">
-                <SubtaskList
-                  taskId={currentTask.id}
-                  userId={userId || ""}
-                  onSubtasksChange={() => {
-                    // Fetch updated tasks without causing a re-render loop
-                    const fetchUpdatedTasks = async () => {
-                      try {
-                        const { data: updatedTasksData } = await supabase
-                          .from("tasks")
-                          .select("*")
-                          .eq("user_id", userId || "");
-
-                        if (updatedTasksData) {
-                          // Only update if there are actual changes
-                          const hasChanges =
-                            JSON.stringify(updatedTasksData) !==
-                            JSON.stringify(tasks);
-                          if (hasChanges) {
-                            setTasks(updatedTasksData);
-                          }
-                        }
-                      } catch (error) {
-                        console.error("Error refreshing tasks:", error);
-                      }
-                    };
-
-                    fetchUpdatedTasks();
-                  }}
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="flex justify-end gap-2 mt-4">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (isNewTask) {
-                setIsCreating(false);
-              } else {
-                setIsEditing(false);
-                setCurrentTask(null);
-              }
-            }}
-          >
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => isNewTask ? setIsCreating(false) : setIsEditing(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={() => isNewTask ? handleCreateTask() : handleUpdateTask()}>
             {isNewTask ? "Create Task" : "Update Task"}
           </Button>
         </div>
@@ -881,7 +763,7 @@ export default function TaskDashboard({
             <DialogHeader>
               <DialogTitle>Create New Task</DialogTitle>
             </DialogHeader>
-            {renderTaskForm()}
+            {renderTaskForm(true)}
           </DialogContent>
         </Dialog>
 
@@ -890,7 +772,7 @@ export default function TaskDashboard({
             <DialogHeader>
               <DialogTitle>Edit Task</DialogTitle>
             </DialogHeader>
-            {renderTaskForm()}
+            {renderTaskForm(false)}
           </DialogContent>
         </Dialog>
       </div>
