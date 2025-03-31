@@ -20,13 +20,28 @@ import { useToast } from "./ui/use-toast";
 import { 
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue
 } from "./ui/select";
-import { Upload, User as UserIcon, Sun, Moon, Laptop } from "lucide-react";
+import { Upload, User as UserIcon, Sun, Moon, Laptop, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { updateUserProfile } from "@/app/actions/profile";
+import { useTheme } from "next-themes";
+
+interface Theme {
+  id: string;
+  name: string;
+  description: string | null;
+  is_preset: boolean;
+  colors: {
+    primary: { hue: number; saturation: number; lightness: number };
+    brand: { hue: number; saturation: number; lightness: number };
+  };
+}
 
 interface UserProfile {
   id: string;
@@ -48,29 +63,154 @@ export default function ProfileEditor({ user, authUser }: ProfileEditorProps) {
   const supabase = createClient();
   const router = useRouter();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [isPending, startTransition] = useTransition();
   
   const [name, setName] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
-  const [themePreference, setThemePreference] = useState<string>("system");
+  const [displayMode, setDisplayMode] = useState<string>("system");
+  const [themePreference, setThemePreference] = useState<string>("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [presetThemes, setPresetThemes] = useState<Theme[]>([]);
+  
+  // Load preset themes
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const { data: themes, error } = await supabase
+          .from('themes')
+          .select('*')
+          .eq('is_preset', true)
+          .order('name');
+          
+        if (error) {
+          console.error("Error loading themes:", error);
+          return;
+        }
+        
+        setPresetThemes(themes || []);
+      } catch (error) {
+        console.error("Error loading themes:", error);
+      }
+    };
+    
+    loadThemes();
+  }, [supabase]);
   
   // Initialize form values from props
   useEffect(() => {
-    if (user) {
-      setName(user.name || "");
-      setFullName(user.full_name || "");
-      setAvatarUrl(user.avatar_url || "");
-      setThemePreference(user.theme_preference || "system");
-    } else if (authUser) {
-      // Fallback to auth user data if available
-      setName(authUser.user_metadata?.name || "");
-      setFullName(authUser.user_metadata?.full_name || "");
-      setAvatarUrl(authUser.user_metadata?.avatar_url || "");
+    const initializeValues = async () => {
+      if (user) {
+        setName(user.name || "");
+        setFullName(user.full_name || "");
+        setAvatarUrl(user.avatar_url || "");
+        
+        // Check if theme_preference is a UUID (color theme) or display mode
+        const themePreference = user.theme_preference || "system";
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(themePreference);
+        
+        if (isUUID) {
+          // It's a color theme
+          setThemePreference(themePreference);
+          
+          // Check if we already have the theme loaded in presetThemes
+          const foundTheme = presetThemes.find(t => t.id === themePreference);
+          
+          // If theme not found in presets but is a valid UUID, fetch it directly
+          if (!foundTheme && presetThemes.length > 0) {
+            try {
+              const { data: themeData } = await supabase
+                .from('themes')
+                .select('*')
+                .eq('id', themePreference)
+                .single();
+                
+              if (themeData?.colors) {
+                // Apply theme colors immediately
+                applyThemeColors(themeData.colors);
+              }
+            } catch (error) {
+              console.error("Error fetching theme:", error);
+            }
+          } else if (foundTheme) {
+            // Apply theme colors from the already loaded preset
+            applyThemeColors(foundTheme.colors);
+          }
+          
+          // We don't know the display mode, so use whatever is current or default to system
+          setDisplayMode(theme || "system");
+        } else {
+          // It's a display mode
+          setDisplayMode(themePreference);
+          // No color theme selected initially
+          setThemePreference("");
+        }
+      } else if (authUser) {
+        // Fallback to auth user data if available
+        setName(authUser.user_metadata?.name || "");
+        setFullName(authUser.user_metadata?.full_name || "");
+        setAvatarUrl(authUser.user_metadata?.avatar_url || "");
+        setDisplayMode(theme || "system");
+        setThemePreference("");
+      }
+    };
+    
+    initializeValues();
+  }, [user, authUser, theme, presetThemes, supabase]);
+  
+  // Apply theme colors to CSS variables
+  const applyThemeColors = (colors: any) => {
+    // Get CSS variables root
+    const root = document.documentElement;
+    
+    // Apply primary color
+    if (colors.primary) {
+      const { hue, saturation, lightness } = colors.primary;
+      root.style.setProperty('--primary', `${hue} ${saturation}% ${lightness}%`);
+      root.style.setProperty('--ring', `${hue} ${saturation}% ${lightness}%`);
     }
-  }, [user, authUser]);
+    
+    // Apply brand colors
+    if (colors.brand) {
+      const { hue, saturation, lightness } = colors.brand;
+      
+      // Generate brand color palette
+      const generateBrandColor = (l: number) => {
+        return `${hue} ${saturation}% ${l}%`;
+      };
+      
+      root.style.setProperty('--brand-50', generateBrandColor(97));
+      root.style.setProperty('--brand-100', generateBrandColor(94));
+      root.style.setProperty('--brand-200', generateBrandColor(85));
+      root.style.setProperty('--brand-300', generateBrandColor(75));
+      root.style.setProperty('--brand-400', generateBrandColor(55));
+      root.style.setProperty('--brand-500', generateBrandColor(45));
+      root.style.setProperty('--brand-600', generateBrandColor(36));
+      root.style.setProperty('--brand-700', generateBrandColor(29));
+      root.style.setProperty('--brand-800', generateBrandColor(23));
+      root.style.setProperty('--brand-900', generateBrandColor(19));
+      root.style.setProperty('--brand-950', generateBrandColor(10));
+    }
+  };
+  
+  // Handle theme change
+  const handleThemeChange = (value: string) => {
+    setThemePreference(value);
+    
+    // If it's a preset theme (UUID), apply its colors
+    const selectedTheme = presetThemes.find(t => t.id === value);
+    if (selectedTheme) {
+      applyThemeColors(selectedTheme.colors);
+    }
+  };
+  
+  // Handle display mode change
+  const handleDisplayModeChange = (value: string) => {
+    setDisplayMode(value);
+    setTheme(value);
+  };
   
   // Handle avatar file change
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +236,13 @@ export default function ProfileEditor({ user, authUser }: ProfileEditorProps) {
     formData.append("name", name);
     formData.append("full_name", fullName);
     formData.append("current_avatar_url", avatarUrl);
-    formData.append("theme_preference", themePreference);
+    
+    // Save theme preference (UUID) if present, otherwise save display mode
+    const preferenceToSave = themePreference || displayMode;
+    formData.append("theme_preference", preferenceToSave);
+    
+    // Always include display mode in form data
+    formData.append("display_mode", displayMode);
     
     if (avatarFile) {
       formData.append("avatar", avatarFile);
@@ -221,29 +367,91 @@ export default function ProfileEditor({ user, authUser }: ProfileEditorProps) {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="theme">Theme Preference</Label>
-              <Select 
-                value={themePreference} 
-                onValueChange={setThemePreference}
-              >
-                <SelectTrigger id="theme">
-                  <SelectValue placeholder="Select a theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light" className="flex items-center gap-2">
-                    <Sun size={16} className="text-yellow-500" />
-                    <span>Light</span>
-                  </SelectItem>
-                  <SelectItem value="dark" className="flex items-center gap-2">
-                    <Moon size={16} className="text-blue-400" />
-                    <span>Dark</span>
-                  </SelectItem>
-                  <SelectItem value="system" className="flex items-center gap-2">
-                    <Laptop size={16} />
-                    <span>System</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="display-mode">Display Mode</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDisplayModeChange("light")}
+                  className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md text-sm border shadow-sm ${
+                    displayMode === "light" ? "bg-muted border-primary" : "hover:bg-muted/50 border-muted"
+                  }`}
+                >
+                  <Sun size={16} className="text-yellow-500" />
+                  <span>Light</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisplayModeChange("dark")}
+                  className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md text-sm border shadow-sm ${
+                    displayMode === "dark" ? "bg-muted border-primary" : "hover:bg-muted/50 border-muted"
+                  }`}
+                >
+                  <Moon size={16} className="text-blue-400" />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisplayModeChange("system")}
+                  className={`flex items-center justify-center space-x-2 px-3 py-2 rounded-md text-sm border shadow-sm ${
+                    displayMode === "system" ? "bg-muted border-primary" : "hover:bg-muted/50 border-muted"
+                  }`}
+                >
+                  <Laptop size={16} />
+                  <span>System</span>
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose light, dark, or system-based display mode
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="color-theme">Color Theme</Label>
+              <div className="border rounded-md">
+                <Select value={themePreference} onValueChange={handleThemeChange}>
+                  <SelectTrigger id="color-theme">
+                    <SelectValue placeholder="Select a color theme">
+                      {themePreference ? (
+                        <div className="flex items-center">
+                          <div 
+                            className="w-4 h-4 rounded-full mr-2" 
+                            style={{
+                              backgroundColor: presetThemes.find(t => t.id === themePreference)?.colors ? 
+                                `hsl(${presetThemes.find(t => t.id === themePreference)?.colors.primary.hue} ${presetThemes.find(t => t.id === themePreference)?.colors.primary.saturation}% ${presetThemes.find(t => t.id === themePreference)?.colors.primary.lightness}%)` : 
+                                undefined
+                            }}
+                          />
+                          <span>{presetThemes.find(t => t.id === themePreference)?.name || "Select a color theme"}</span>
+                        </div>
+                      ) : (
+                        "Select a color theme"
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {presetThemes.map(theme => (
+                      <SelectItem 
+                        key={theme.id} 
+                        value={theme.id} 
+                        className="flex cursor-pointer"
+                      >
+                        <div className="flex items-center w-full">
+                          <div 
+                            className="w-4 h-4 rounded-full mr-2" 
+                            style={{
+                              backgroundColor: `hsl(${theme.colors.primary.hue} ${theme.colors.primary.saturation}% ${theme.colors.primary.lightness}%)`
+                            }}
+                          />
+                          <span>{theme.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose a color theme for the application
+              </p>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -254,10 +462,7 @@ export default function ProfileEditor({ user, authUser }: ProfileEditorProps) {
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isPending}
-            >
+            <Button type="submit" disabled={isPending}>
               {isPending ? "Saving..." : "Save Changes"}
             </Button>
           </CardFooter>

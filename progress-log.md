@@ -132,6 +132,17 @@
 - Real-time team inbox communication
 
 ## Recent Enhancements
+- **Enhanced Theme System with Separated Display Mode & Color Theme Selection:**
+  - Implemented separation between display mode (light/dark/system) and color themes
+  - Added horizontal display mode selection buttons with visual indicators
+  - Created improved color theme dropdown with preview circles
+  - Fixed theme preference persistence and initialization from backend
+  - Added visual feedback for selected themes with borders and checkmarks
+  - Updated server actions to handle both UUID-based themes and display modes
+  - Fixed layout issues in theme selectors for better usability
+  - Ensured consistent theme application on initial page load
+  - Improved user experience with clearer theme selection UI
+
 - **Implemented Comprehensive User Profile Management:**
   - Created a dedicated profile page for viewing and editing user information
   - Added ability to upload and manage profile avatars with image preview

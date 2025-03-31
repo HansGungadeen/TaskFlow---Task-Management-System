@@ -2,13 +2,17 @@
 
 import { createClient } from "../../../supabase/server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-interface ProfileUpdateData {
-  name?: string | null;
-  full_name?: string | null;
-  avatar_url?: string | null;
-  theme_preference?: string | null;
-  updated_at?: string;
+interface ProfileFormState {
+  message: string;
+  errors: {
+    displayName?: string[];
+    fullName?: string[];
+    email?: string[];
+    themePreference?: string[];
+  };
 }
 
 export async function updateUserProfile(formData: FormData) {
@@ -18,7 +22,7 @@ export async function updateUserProfile(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    return { success: false, error: "Not authenticated" };
+    return { success: false, error: "You must be logged in to update your profile" };
   }
   
   try {
@@ -26,6 +30,7 @@ export async function updateUserProfile(formData: FormData) {
     const name = formData.get("name") as string | null;
     const fullName = formData.get("full_name") as string | null;
     const themePreference = formData.get("theme_preference") as string | null;
+    const displayMode = formData.get("display_mode") as string | null;
     
     // Handle avatar file if present
     const avatarFile = formData.get("avatar") as File | null;
@@ -42,9 +47,6 @@ export async function updateUserProfile(formData: FormData) {
         
         // Only try to create the bucket if it doesn't exist
         if (!bucketExists) {
-          // Use service role for bucket creation to bypass RLS
-          // This requires proper setup in your middleware or server environment
-          // If you don't have access to serviceRoleClient, you will need to create the bucket manually in Supabase dashboard
           try {
             await supabase
               .storage
@@ -57,12 +59,11 @@ export async function updateUserProfile(formData: FormData) {
             // If bucket creation fails, but it's not because it already exists, handle gracefully
             if (!bucketError.message?.includes('already exists')) {
               console.error('Failed to create bucket:', bucketError);
-              // Continue anyway as the bucket might exist but not be visible to the current user
             }
           }
         }
       
-        // Upload the file - this should work even if we couldn't create the bucket (as long as it exists)
+        // Upload the file
         const fileExt = avatarFile.name.split('.').pop();
         const filePath = `${user.id}/${Date.now()}.${fileExt}`;
         
@@ -72,7 +73,6 @@ export async function updateUserProfile(formData: FormData) {
           .upload(filePath, avatarFile, { upsert: true });
           
         if (uploadError) {
-          // If upload fails due to RLS, try another approach
           if (uploadError.message?.includes('new row violates row-level security policy')) {
             return { 
               success: false, 
@@ -81,7 +81,7 @@ export async function updateUserProfile(formData: FormData) {
           }
           return { success: false, error: `Failed to upload avatar: ${uploadError.message}` };
         }
-        
+
         // Get the public URL
         const { data: publicUrlData } = supabase
           .storage
@@ -95,16 +95,36 @@ export async function updateUserProfile(formData: FormData) {
       }
     }
     
-    // Update the user profile
-    const updateData: ProfileUpdateData = {
+    // Prepare update data
+    const updateData: any = {
       updated_at: new Date().toISOString()
     };
     
     if (name !== null) updateData.name = name;
     if (fullName !== null) updateData.full_name = fullName;
     if (avatarUrl !== null) updateData.avatar_url = avatarUrl;
-    if (themePreference !== null) updateData.theme_preference = themePreference;
     
+    // Handle theme preference
+    // Check if theme_preference is a valid UUID or a display mode
+    const isValidUUID = themePreference ? 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(themePreference) : 
+      false;
+      
+    const validDisplayModes = ['light', 'dark', 'system'];
+    
+    // Determine what to save as theme_preference
+    if (themePreference !== null) {
+      // If it's a UUID (color theme) or a valid display mode, save it directly
+      if (isValidUUID || validDisplayModes.includes(themePreference)) {
+        updateData.theme_preference = themePreference;
+      }
+      // If display_mode is provided and theme_preference isn't valid, use display_mode
+      else if (displayMode && validDisplayModes.includes(displayMode)) {
+        updateData.theme_preference = displayMode;
+      }
+    }
+    
+    // Update user profile
     const { error: updateError } = await supabase
       .from('users')
       .update(updateData)
@@ -124,7 +144,7 @@ export async function updateUserProfile(formData: FormData) {
     });
     
     // Revalidate the profile page
-    revalidatePath('/dashboard/profile');
+    revalidatePath('/');
     
     return { success: true };
   } catch (error: any) {

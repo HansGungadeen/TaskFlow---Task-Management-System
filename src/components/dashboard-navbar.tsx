@@ -12,7 +12,7 @@ import {
 import { Button } from "./ui/button";
 import { UserCircle, Home, CheckSquare, Plus, Users, LayoutGrid, Calendar, Menu, X, BarChart2, Clock } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import { ThemeToggle } from "./theme-toggle";
+import { ThemeSelector } from "./theme-selector";
 import UserProfile from "./user-profile";
 import { NotificationBell } from "./notification-bell";
 import { cn } from "@/lib/utils";
@@ -137,7 +137,7 @@ export default function DashboardNavbar() {
             <Plus className="h-4 w-4" /> New Task
           </Button>
           {userId && <NotificationBell userId={userId} />}
-          <ThemeToggle />
+          <ThemeSelector />
           <UserProfile />
         </div>
       </div>
