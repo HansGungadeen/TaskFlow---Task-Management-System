@@ -784,7 +784,7 @@ export default function TaskDashboard({
             <h3 className="text-sm font-medium text-muted-foreground">Filters:</h3>
           </div>
           
-          <div className="flex flex-wrap gap-3 w-full">
+          <div className="flex flex-col gap-3 w-full">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">Due:</span>
               <Button 
@@ -829,9 +829,26 @@ export default function TaskDashboard({
               </Button>
             </div>
             
-            <div className="flex flex-wrap items-center gap-2 ml-auto">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Assignee:</span>
+                <Select
+                  value={assigneeFilter || "all"}
+                  onValueChange={(value) => setAssigneeFilter(value === "all" ? null : value)}
+                >
+                  <SelectTrigger className="h-9 w-[180px]">
+                    <SelectValue placeholder="All Assignees" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Assignees</SelectItem>
+                    <SelectItem value="mine">Assigned to Me</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
               {userTeams && userTeams.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ml-4">
                   <span className="text-sm text-muted-foreground">Team:</span>
                   <Select
                     value={teamFilter || "all"}
@@ -853,26 +870,9 @@ export default function TaskDashboard({
                 </div>
               )}
               
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Assignee:</span>
-                <Select
-                  value={assigneeFilter || "all"}
-                  onValueChange={(value) => setAssigneeFilter(value === "all" ? null : value)}
-                >
-                  <SelectTrigger className="h-9 w-[180px]">
-                    <SelectValue placeholder="All Assignees" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Assignees</SelectItem>
-                    <SelectItem value="mine">Assigned to Me</SelectItem>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
               <Button
                 variant="outline"
-                className="h-9"
+                className="h-9 ml-auto"
                 onClick={() => {
                   setDueDateFilter(null);
                   setTeamFilter(null);
@@ -905,7 +905,7 @@ export default function TaskDashboard({
           </TabsList>
 
           <TabsContent value="todo" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
               {todoTasks.length === 0 ? (
                 <p className="text-gray-500 col-span-full text-center py-8">
                   No tasks to do yet. Create your first task!
@@ -928,7 +928,7 @@ export default function TaskDashboard({
           </TabsContent>
 
           <TabsContent value="in_progress" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
               {inProgressTasks.length === 0 ? (
                 <p className="text-gray-500 col-span-full text-center py-8">
                   No tasks in progress.
@@ -951,7 +951,7 @@ export default function TaskDashboard({
           </TabsContent>
 
           <TabsContent value="done" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
               {doneTasks.length === 0 ? (
                 <p className="text-gray-500 col-span-full text-center py-8">
                   No completed tasks yet.
@@ -1090,45 +1090,8 @@ export default function TaskDashboard({
         }}
       />
 
-      {/* Task Filters */}
+      {/* Remove the duplicate filters section and keep just the "Add Task" button and view toggles */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2">
-          <DueDateFilter value={dueDateFilter} onChange={setDueDateFilter} />
-
-          {userTeams.length > 0 && (
-            <Select
-              value={teamFilter || "all"}
-              onValueChange={(value) => setTeamFilter(value === "all" ? null : value)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {userTeams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select
-            value={assigneeFilter || "all"}
-            onValueChange={(value) => setAssigneeFilter(value === "all" ? null : value)}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Assigned To" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tasks</SelectItem>
-              <SelectItem value="none">Unassigned</SelectItem>
-              <SelectItem value={userId || ""}>My Tasks</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="flex items-center gap-2">
           <TaskExport tasks={filteredTasks} buttonSize="sm" />
           
@@ -1245,20 +1208,20 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
   return (
     <>
       <Card
-        className={
+        className={`flex flex-col h-[260px] ${
           isOverdue ? "border-red-500" : isDueSoon ? "border-yellow-500" : ""
-        }
+        }`}
       >
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex-shrink-0">
           <div className="flex justify-between items-start">
             <div>
               <CardTitle
-                className="text-lg cursor-pointer hover:text-primary transition-colors"
+                className="text-lg cursor-pointer hover:text-primary transition-colors line-clamp-1"
                 onClick={() => setViewTaskOpen(true)}
               >
                 {task.title}
               </CardTitle>
-              <div className="flex flex-wrap gap-1 mt-1">
+              <div className="flex flex-wrap gap-1 mt-1 h-[28px] overflow-hidden">
                 {task.priority && (
                   <span
                     className={`text-xs px-2 py-1 rounded-full inline-block ${getPriorityColor(task.priority)}`}
@@ -1333,10 +1296,10 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
           </div>
         </CardHeader>
         <CardContent
-          className="cursor-pointer"
+          className="cursor-pointer flex-grow overflow-hidden"
           onClick={() => setViewTaskOpen(true)}
         >
-          <p className="text-sm text-gray-500 min-h-[40px]">
+          <p className="text-sm text-gray-500 line-clamp-3 min-h-[60px] mb-auto">
             {task.description || "No description"}
           </p>
           
@@ -1373,7 +1336,7 @@ function TaskCard({ task, onEdit, onDelete, onStatusChange }: TaskCardProps) {
             </p>
           )}
         </CardContent>
-        <CardFooter className="flex justify-between pt-2 border-t">
+        <CardFooter className="flex justify-between pt-2 border-t flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500">
               {new Date(task.created_at).toLocaleDateString("en-US")}

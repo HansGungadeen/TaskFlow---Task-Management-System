@@ -1,11 +1,18 @@
 import DashboardLayout from "@/components/dashboard-layout";
 import TaskDashboard from "@/components/task-dashboard";
-import { InfoIcon, UserCircle, Users, Calendar } from "lucide-react";
+import MiniCalendar from "@/components/mini-calendar";
+import MiniTeamTasks from "@/components/mini-team-tasks";
+import { InfoIcon, UserCircle, Users, Calendar, BarChart2, Clock, MessageSquare, ChevronRight, UserCheck, CheckCircle } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { TaskExport } from "@/components/task-export";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import TaskCreationCompletion from "@/components/task-creation-vs-completion";
 
 export default async function Dashboard({ 
   searchParams 
@@ -95,6 +102,7 @@ export default async function Dashboard({
     .from("team_members")
     .select(`
       team_id,
+      role,
       teams:team_id (
         id,
         name
@@ -112,23 +120,59 @@ export default async function Dashboard({
     }))
   ];
 
+  // Determine the primary team for activity feed
+  const primaryTeamId = teamId || (userTeams.length > 0 ? userTeams[0].id : null);
+  const primaryTeamName = userTeams.find(team => team.id === primaryTeamId)?.name || "Team";
+
+  // Get team members data for the primary team
+  const { data: teamMembers } = await supabase
+    .from("team_members_with_users")
+    .select("*")
+    .eq("team_id", primaryTeamId);
+
+  // Fetch recent team activity 
+  const { data: recentActivity } = await supabase
+    .from("task_history")
+    .select(`
+      id, 
+      task_id, 
+      user_id, 
+      action_type, 
+      created_at,
+      details,
+      user:user_id (
+        name,
+        email,
+        avatar_url
+      )
+    `)
+    .eq("team_id", primaryTeamId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
   return (
     <DashboardLayout>
       {/* Header Section */}
-      <header className="flex flex-col gap-4">
+      <header className="flex flex-col gap-4 mb-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Task Dashboard</h1>
+          <h1 className="text-3xl font-bold">TaskFlow Dashboard</h1>
           <div className="flex gap-2">
             <Link href="/dashboard/calendar">
               <Button variant="outline" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                <span>Calendar View</span>
+                <span>Calendar</span>
               </Button>
             </Link>
             <Link href="/teams">
               <Button variant="outline" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                <span>Manage Teams</span>
+                <span>Teams</span>
+              </Button>
+            </Link>
+            <Link href="/analytics">
+              <Button variant="outline" className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4" />
+                <span>Analytics</span>
               </Button>
             </Link>
             {processedTasks?.length > 0 && (
@@ -138,20 +182,93 @@ export default async function Dashboard({
         </div>
         <div className="bg-secondary/50 text-sm p-3 px-4 rounded-lg text-muted-foreground flex gap-2 items-center">
           <InfoIcon size="14" />
-          <span>Manage and organize your tasks efficiently</span>
+          <span>Welcome to your TaskFlow Dashboard - Manage tasks, view your calendar, and track team activity all in one place.</span>
         </div>
       </header>
 
-      {/* Task Dashboard Section */}
-      <section className="bg-card rounded-xl p-6 border shadow-sm">
-        <TaskDashboard 
-          initialTasks={processedTasks} 
-          userTeams={userTeams}
-          userId={user.id}
-          initialTeamFilter={teamId}
-          initialTaskId={taskId}
-        />
-      </section>
+      {/* Dashboard Content - Now in a grid layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Main Task Dashboard Section - Takes up 3/4 on desktop */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-1 pt-3 px-4">
+              <CardTitle className="text-xl flex items-center">
+                <Clock className="h-5 w-5 mr-2" />
+                My Tasks
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 py-2">
+              <TaskDashboard 
+                initialTasks={processedTasks} 
+                userTeams={userTeams}
+                userId={user.id}
+                initialTeamFilter={teamId}
+                initialTaskId={taskId}
+              />
+            </CardContent>
+          </Card>
+          
+          {/* Task Creation vs Completion Chart */}
+          <TaskCreationCompletion userId={user.id} teamId={teamId} />
+        </div>
+
+        {/* Right sidebar for calendar and activity feed */}
+        <div className="space-y-6">
+          {/* Mini Calendar Section */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl flex items-center">
+                <Calendar className="h-5 w-5 mr-2" />
+                Upcoming Schedule
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2 pb-2">
+              <div className="p-2">
+                <MiniCalendar 
+                  tasks={processedTasks}
+                  teamId={teamId}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="pt-0">
+              <Link href="/dashboard/calendar" className="w-full">
+                <Button variant="outline" className="w-full text-sm">
+                  View Full Calendar
+                </Button>
+              </Link>
+            </CardFooter>
+          </Card>
+
+          {/* Team Activity Feed Section */}
+          {primaryTeamId && (
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl flex items-center">
+                  <MessageSquare className="h-5 w-5 mr-2" />
+                  Team Tasks
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[400px] overflow-y-auto pt-2">
+                <MiniTeamTasks
+                  tasks={processedTasks}
+                  teamId={primaryTeamId}
+                  userId={user.id}
+                  maxTasks={8}
+                />
+              </CardContent>
+              <CardFooter className="pt-0">
+                {primaryTeamId && (
+                  <Link href={`/teams/${primaryTeamId}`} className="w-full">
+                    <Button variant="outline" className="w-full text-sm">
+                      View Team Details
+                    </Button>
+                  </Link>
+                )}
+              </CardFooter>
+            </Card>
+          )}
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

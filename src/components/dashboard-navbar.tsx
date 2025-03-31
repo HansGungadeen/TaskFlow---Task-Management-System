@@ -37,7 +37,7 @@ export default function DashboardNavbar() {
 
   return (
     <nav className="w-full border-b border-border bg-background py-4">
-      <div className="container mx-auto px-4 max-w-full md:max-w-[95%] lg:max-w-[90%] xl:max-w-[1280px] flex justify-between items-center">
+      <div className="container mx-auto px-2 max-w-full md:max-w-[99%] lg:max-w-[98%] xl:max-w-[1600px] flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link
             href="/"
