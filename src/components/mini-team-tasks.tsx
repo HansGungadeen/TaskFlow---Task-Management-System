@@ -87,6 +87,141 @@ export default function MiniTeamTasks({
     setFilteredTasks(sorted);
   }, [teamId, tasks]);
 
+  // Subscribe to task changes in real-time
+  useEffect(() => {
+    if (!teamId) return;
+    
+    // Set up subscription for realtime updates
+    const tasksSubscription = supabase
+      .channel('mini_team_tasks_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `team_id=eq.${teamId}`,
+        },
+        async () => {
+          console.log("Real-time update detected for team tasks");
+          
+          // Fetch updated tasks for this team
+          const { data: updatedTasks, error } = await supabase
+            .from('tasks')
+            .select(`
+              *,
+              subtasks (
+                id,
+                title,
+                completed
+              )
+            `)
+            .eq('team_id', teamId)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+            console.error("Error fetching updated team tasks:", error);
+            return;
+          }
+          
+          if (!updatedTasks || updatedTasks.length === 0) {
+            setFilteredTasks([]);
+            return;
+          }
+          
+          // Get assignee data for assigned tasks
+          const assignedTaskIds = updatedTasks
+            .filter(task => task.assigned_to)
+            .map(task => task.assigned_to);
+            
+          let assigneeData: Record<string, any> = {};
+            
+          if (assignedTaskIds.length > 0) {
+            const { data: assignees } = await supabase
+              .from('users')
+              .select('id, email, name, avatar_url')
+              .in('id', assignedTaskIds as string[]);
+              
+            if (assignees) {
+              assigneeData = assignees.reduce((acc, user) => {
+                acc[user.id] = user;
+                return acc;
+              }, {} as Record<string, any>);
+            }
+          }
+          
+          // Process the tasks with computed properties
+          const processedTasks = updatedTasks.map(task => {
+            // Count completed subtasks
+            const subtasksCount = task.subtasks?.length || 0;
+            const completedSubtasksCount = task.subtasks?.filter((st: any) => st.completed)?.length || 0;
+            
+            // Add assignee data if available
+            const assignee_data = task.assigned_to && assigneeData[task.assigned_to] 
+              ? {
+                  id: assigneeData[task.assigned_to].id,
+                  email: assigneeData[task.assigned_to].email,
+                  name: assigneeData[task.assigned_to].name || null,
+                  avatar_url: assigneeData[task.assigned_to].avatar_url || null
+                }
+              : null;
+              
+            return {
+              ...task,
+              subtasks_count: subtasksCount,
+              completed_subtasks_count: completedSubtasksCount,
+              assignee_data
+            };
+          });
+            
+          // Sort tasks by the same logic as in the initial load
+          const sorted = [...processedTasks].sort((a, b) => {
+            // First priority - overdue tasks
+            const aOverdue = a.due_date && isBefore(new Date(a.due_date), new Date());
+            const bOverdue = b.due_date && isBefore(new Date(b.due_date), new Date());
+            
+            if (aOverdue && !bOverdue) return -1;
+            if (!aOverdue && bOverdue) return 1;
+            
+            // Second priority - status (todo, then in_progress, then done)
+            const statusPriority = { todo: 0, in_progress: 1, done: 2 };
+            const aStatus = statusPriority[a.status as keyof typeof statusPriority] || 0;
+            const bStatus = statusPriority[b.status as keyof typeof statusPriority] || 0;
+            
+            if (aStatus !== bStatus) return aStatus - bStatus;
+            
+            // Third priority - due date (sooner first)
+            if (a.due_date && b.due_date) {
+              return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+            }
+            
+            // Tasks with due dates come before tasks without
+            if (a.due_date && !b.due_date) return -1;
+            if (!a.due_date && b.due_date) return 1;
+            
+            // Finally, sort by creation date
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+            
+          setFilteredTasks(sorted);
+          
+          // Update selected task if it's currently open
+          if (selectedTask) {
+            const updatedSelectedTask = processedTasks.find(t => t.id === selectedTask.id);
+            if (updatedSelectedTask) {
+              setSelectedTask(updatedSelectedTask);
+            }
+          }
+        }
+      )
+      .subscribe();
+      
+    // Clean up subscription on unmount or when teamId changes
+    return () => {
+      supabase.removeChannel(tasksSubscription);
+    };
+  }, [teamId, supabase, selectedTask]);
+
   // Apply filter
   const displayTasks = filter === 'all' 
     ? filteredTasks 

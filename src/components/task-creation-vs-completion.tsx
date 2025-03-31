@@ -57,6 +57,46 @@ export default function TaskCreationCompletion({
     fetchData();
   }, [userId, teamId, days]);
 
+  // Set up real-time subscription for task changes
+  useEffect(() => {
+    // Create appropriate channel name based on filters
+    const channelName = teamId 
+      ? `team_${teamId}_analytics_channel` 
+      : userId 
+        ? `user_${userId}_analytics_channel` 
+        : 'task_analytics_channel';
+    
+    // Set up subscription for task updates
+    const filter = teamId 
+      ? `team_id=eq.${teamId}` 
+      : userId 
+        ? `user_id=eq.${userId}` 
+        : undefined;
+    
+    const tasksSubscription = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: filter,
+        },
+        () => {
+          console.log('Real-time update detected for task analytics data');
+          // Refresh chart data when tasks change
+          fetchData();
+        }
+      )
+      .subscribe();
+      
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(tasksSubscription);
+    };
+  }, [userId, teamId]);
+
   const fetchData = async () => {
     setLoading(true);
     try {

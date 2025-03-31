@@ -126,6 +126,72 @@ export default function TaskDashboard({
   const [userData, setUserData] = useState<any>(null);
   const [teamMembers, setTeamMembers] = useState<Record<string, AssigneeData[]>>({});
 
+  // Function to filter tasks based on filters
+  const filterTasks = (
+    tasksToFilter: Task[],
+    dueDateFilter: string | null,
+    teamFilter: string | null,
+    assigneeFilter: string | null
+  ): Task[] => {
+    let filtered = [...tasksToFilter];
+    
+    // Apply due date filter if set
+    if (dueDateFilter) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+
+      if (dueDateFilter === "today") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate >= today && taskDate < tomorrow;
+        });
+      } else if (dueDateFilter === "tomorrow") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          const nextDay = new Date(tomorrow);
+          nextDay.setDate(nextDay.getDate() + 1);
+          return taskDate >= tomorrow && taskDate < nextDay;
+        });
+      } else if (dueDateFilter === "week") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate >= today && taskDate < nextWeek;
+        });
+      } else if (dueDateFilter === "overdue") {
+        filtered = filtered.filter((task) => {
+          if (!task.due_date) return false;
+          const taskDate = new Date(task.due_date);
+          return taskDate < today && task.status !== "done";
+        });
+      }
+    }
+    
+    // Apply team filter if set
+    if (teamFilter) {
+      filtered = filtered.filter((task) => task.team_id === teamFilter);
+    }
+    
+    // Apply assignee filter if set
+    if (assigneeFilter) {
+      if (assigneeFilter === 'unassigned') {
+        filtered = filtered.filter((task) => !task.assigned_to);
+      } else if (assigneeFilter === 'mine') {
+        filtered = filtered.filter((task) => task.assigned_to === userId);
+      } else {
+        filtered = filtered.filter((task) => task.assigned_to === assigneeFilter);
+      }
+    }
+    
+    return filtered;
+  };
+
   // Set isClient to true once component mounts and fetch user data
   useEffect(() => {
     setIsClient(true);
@@ -248,6 +314,65 @@ export default function TaskDashboard({
           JSON.stringify(updatedTasks) !== JSON.stringify(tasks);
         if (hasChanges) {
           setTasks(updatedTasks);
+          
+          // Apply filters manually instead of using filterTasks function
+          let filtered = [...updatedTasks];
+          
+          // Apply due date filter if set
+          if (dueDateFilter) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const nextWeek = new Date(today);
+            nextWeek.setDate(nextWeek.getDate() + 7);
+
+            if (dueDateFilter === "today") {
+              filtered = filtered.filter((task) => {
+                if (!task.due_date) return false;
+                const taskDate = new Date(task.due_date);
+                return taskDate >= today && taskDate < tomorrow;
+              });
+            } else if (dueDateFilter === "tomorrow") {
+              filtered = filtered.filter((task) => {
+                if (!task.due_date) return false;
+                const taskDate = new Date(task.due_date);
+                const nextDay = new Date(tomorrow);
+                nextDay.setDate(nextDay.getDate() + 1);
+                return taskDate >= tomorrow && taskDate < nextDay;
+              });
+            } else if (dueDateFilter === "week") {
+              filtered = filtered.filter((task) => {
+                if (!task.due_date) return false;
+                const taskDate = new Date(task.due_date);
+                return taskDate >= today && taskDate < nextWeek;
+              });
+            } else if (dueDateFilter === "overdue") {
+              filtered = filtered.filter((task) => {
+                if (!task.due_date) return false;
+                const taskDate = new Date(task.due_date);
+                return taskDate < today && task.status !== "done";
+              });
+            }
+          }
+          
+          // Apply team filter if set
+          if (teamFilter) {
+            filtered = filtered.filter((task) => task.team_id === teamFilter);
+          }
+          
+          // Apply assignee filter if set
+          if (assigneeFilter) {
+            if (assigneeFilter === 'unassigned') {
+              filtered = filtered.filter((task) => !task.assigned_to);
+            } else if (assigneeFilter === 'mine') {
+              filtered = filtered.filter((task) => task.assigned_to === userId);
+            } else {
+              filtered = filtered.filter((task) => task.assigned_to === assigneeFilter);
+            }
+          }
+          
+          setFilteredTasks(filtered);
         }
       } catch (error) {
         console.error("Error fetching task dependencies and subtasks:", error);
@@ -255,7 +380,179 @@ export default function TaskDashboard({
     };
 
     fetchTaskDependenciesAndSubtasks();
-  }, [tasks.length]);
+  }, [supabase.auth]);
+
+  // Subscribe to task changes in real-time
+  useEffect(() => {
+    const tasksSubscription = supabase
+      .channel('dashboard_tasks_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+        },
+        () => {
+          const refreshData = async () => {
+            console.log("Real-time update detected, refreshing tasks data");
+            
+            // Fetch all tasks again instead of using the current tasks array
+            let query = supabase
+              .from("tasks")
+              .select(`
+                *,
+                subtasks (
+                  id,
+                  title,
+                  completed
+                )
+              `);
+            
+            // Filter by team ID if one is selected
+            if (teamFilter) {
+              query = query.eq("team_id", teamFilter);
+            } else {
+              // If no team is selected, only show tasks associated with the user
+              // Either created by them or assigned to them
+              query = query.or(`user_id.eq.${userId},assigned_to.eq.${userId}`);
+            }
+            
+            const { data: allTasks, error } = await query.order("created_at", { ascending: false });
+            
+            if (error) {
+              console.error("Error fetching tasks:", error);
+              return;
+            }
+            
+            if (!allTasks || allTasks.length === 0) {
+              console.log("No tasks found");
+              setTasks([]);
+              setFilteredTasks([]);
+              return;
+            }
+            
+            // Get all dependencies for all tasks
+            const { data: dependenciesData, error: dependenciesError } =
+              await supabase
+                .from("task_dependencies")
+                .select("dependent_task_id, dependency_task_id")
+                .in(
+                  "dependent_task_id",
+                  allTasks.map((task) => task.id),
+                );
+
+            if (dependenciesError) throw dependenciesError;
+
+            // Get subtask counts for all tasks
+            const { data: subtasksData, error: subtasksError } = await supabase
+              .from("subtasks")
+              .select("task_id, completed")
+              .in(
+                "task_id",
+                allTasks.map((task) => task.id),
+              );
+
+            if (subtasksError) throw subtasksError;
+            
+            // Get assignee data for assigned tasks
+            const assignedTaskIds = allTasks
+              .filter(task => task.assigned_to)
+              .map(task => task.assigned_to);
+              
+            let assigneeMap: Record<string, any> = {};
+              
+            if (assignedTaskIds.length > 0) {
+              const { data: assigneesData, error: assigneesError } = await supabase
+                .from("users")
+                .select("id, email, name, avatar_url")
+                .in("id", assignedTaskIds as string[]);
+                
+              if (assigneesError) throw assigneesError;
+              
+              // Create a map of user IDs to user data
+              assigneeMap = (assigneesData || []).reduce((acc, user) => {
+                acc[user.id] = user;
+                return acc;
+              }, {} as Record<string, any>);
+            }
+
+            // Organize dependencies by dependent task
+            const dependencies: Record<string, string[]> = {};
+            dependenciesData?.forEach((dep) => {
+              if (!dependencies[dep.dependent_task_id]) {
+                dependencies[dep.dependent_task_id] = [];
+              }
+              dependencies[dep.dependent_task_id].push(dep.dependency_task_id);
+            });
+
+            // Check status of all dependencies
+            const status: Record<string, boolean> = {};
+            for (const taskId in dependencies) {
+              const dependencyIds = dependencies[taskId];
+              const dependencyTasks = allTasks.filter((task) =>
+                dependencyIds.includes(task.id),
+              );
+              status[taskId] = dependencyTasks.every(
+                (task) => task.status === "done",
+              );
+            }
+
+            // Calculate subtask counts for each task
+            const subtaskCounts: Record<
+              string,
+              { total: number; completed: number }
+            > = {};
+            subtasksData?.forEach((subtask) => {
+              if (!subtaskCounts[subtask.task_id]) {
+                subtaskCounts[subtask.task_id] = { total: 0, completed: 0 };
+              }
+              subtaskCounts[subtask.task_id].total += 1;
+              if (subtask.completed) {
+                subtaskCounts[subtask.task_id].completed += 1;
+              }
+            });
+
+            // Update tasks with dependency and subtask information
+            const updatedTasks = allTasks.map((task) => ({
+              ...task,
+              has_dependencies: dependencies[task.id]?.length > 0,
+              dependencies_completed: status[task.id] || false,
+              subtasks_count: subtaskCounts[task.id]?.total || 0,
+              completed_subtasks_count: subtaskCounts[task.id]?.completed || 0,
+              assignee_data: task.assigned_to && assigneeMap[task.assigned_to] 
+                ? {
+                    id: assigneeMap[task.assigned_to].id,
+                    email: assigneeMap[task.assigned_to].email,
+                    name: assigneeMap[task.assigned_to].name || null,
+                    avatar_url: assigneeMap[task.assigned_to].avatar_url || null
+                  }
+                : null
+            }));
+
+            // Always update with the new tasks
+            setTasks(updatedTasks);
+            
+            // Apply filters to the updated tasks
+            let filtered = [...updatedTasks];
+            
+            // Apply filters
+            filtered = filterTasks(updatedTasks, dueDateFilter, teamFilter, assigneeFilter);
+            
+            setFilteredTasks(filtered);
+          };
+          
+          refreshData().catch(err => {
+            console.error("Error refreshing task data:", err);
+          });
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(tasksSubscription);
+    };
+  }, [dueDateFilter, teamFilter, assigneeFilter, userId]);
 
   // Filter the tasks based on filters
   useEffect(() => {
